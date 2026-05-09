@@ -19,6 +19,7 @@ function ChatContent() {
   const character = getCharacter(mbti);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -43,39 +44,42 @@ function ChatContent() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => {
-      const context: ConversationContext = {
-        conversationId: 'chat',
-        userId: userName,
-        characterId: mbti,
-        history: [...prev, userMessage],
-      };
-
-      const callbacks: StreamCallbacks = {
-        onChunk: () => {},
-        onEmotion: () => {},
-        onComplete: (message: Message) => {
-          setMessages(p => [...p, message]);
-          setIsTyping(false);
-        },
-        onError: () => {
-          setIsTyping(false);
-          setMessages(p => [...p, {
-            id: `msg_${Date.now()}_error`,
-            conversationId: 'chat',
-            role: 'assistant',
-            content: 'ごめんなさい、ちょっと考えがまとまらないです…もう一度話しかけてもらえますか？',
-            timestamp: new Date().toISOString(),
-          }]);
-        },
-      };
-
-      engine.current.generateResponse(userMessage, context, callbacks);
-      return [...prev, userMessage];
-    });
-
+    // Update ref synchronously to avoid stale closure in async callbacks
+    messagesRef.current = [...messagesRef.current, userMessage];
+    setMessages([...messagesRef.current]);
     setInputText('');
     setIsTyping(true);
+
+    const context: ConversationContext = {
+      conversationId: 'chat',
+      userId: userName,
+      characterId: mbti,
+      history: messagesRef.current,
+    };
+
+    const callbacks: StreamCallbacks = {
+      onChunk: () => {},
+      onEmotion: () => {},
+      onComplete: (message: Message) => {
+        messagesRef.current = [...messagesRef.current, message];
+        setMessages([...messagesRef.current]);
+        setIsTyping(false);
+      },
+      onError: () => {
+        const errorMsg: Message = {
+          id: `msg_${Date.now()}_error`,
+          conversationId: 'chat',
+          role: 'assistant',
+          content: 'ごめんなさい、ちょっと考えがまとまらないです…もう一度話しかけてもらえますか？',
+          timestamp: new Date().toISOString(),
+        };
+        messagesRef.current = [...messagesRef.current, errorMsg];
+        setMessages([...messagesRef.current]);
+        setIsTyping(false);
+      },
+    };
+
+    engine.current.generateResponse(userMessage, context, callbacks);
   }, [mbti, userName]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -120,7 +124,7 @@ function ChatContent() {
               <div className="text-4xl mb-4">{character.emoji}</div>
               <h2 className="text-title-1 text-white mb-2">{character.name}です</h2>
               <p className="text-body text-white/60">
-                こんにちは、{userName}さん。{character.japaneseName}の私が、あなたにもう一つの視点もお届けしながらお話ししますね。何でも話してください。
+                こんにちは、{userName}さん。同じ感性を持つ{character.japaneseName}の私が、ちょっと違う角度からの気づきも交えながらお話ししますね。何でも話してください。
               </p>
               <p className="text-caption text-white/30 mt-4">
                 マイクボタンで声でも入力できます
