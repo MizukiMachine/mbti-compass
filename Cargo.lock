@@ -27,6 +27,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "another-me-ai"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-openai",
+ "async-trait",
+ "chrono",
+ "clap",
+ "colored",
+ "dialoguer",
+ "dirs",
+ "dotenvy",
+ "insta",
+ "mockall",
+ "qdrant-client",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2098,33 +2125,6 @@ name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
-
-[[package]]
-name = "shinyu-ai"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-openai",
- "async-trait",
- "chrono",
- "clap",
- "colored",
- "dialoguer",
- "dirs",
- "dotenvy",
- "insta",
- "mockall",
- "qdrant-client",
- "reqwest",
- "serde",
- "serde_json",
- "serial_test",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "shlex"

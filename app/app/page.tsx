@@ -623,6 +623,28 @@ export default function Home() {
               </motion.button>
 
               <motion.button
+                whileHover={{ scale: 1.01, opacity: 0.9 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => {
+                  const animalToMbti: Record<string, string> = {
+                    '狼': 'INTJ', '猿': 'ENTP', '虎': 'ESTP', '子守熊': 'ISFJ',
+                    '黒豹': 'INFJ', 'ライオン': 'ENTJ', 'チータ': 'ESTP', 'ペガサス': 'ENFP',
+                    '象': 'ISTJ', 'たぬき': 'ESFP', 'こじか': 'INFP', 'ひつじ': 'ISFP',
+                  };
+                  const mbti = animalToMbti[fortuneResult.animal] || 'ENFP';
+                  const params = new URLSearchParams({ name: fortuneResult.name || '', mbti });
+                  window.location.href = `/chat?${params.toString()}`;
+                }}
+                className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+                aria-label="AIと話す"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                AIと話す
+              </motion.button>
+
+              <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
                 onClick={() => {

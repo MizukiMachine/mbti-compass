@@ -10,7 +10,6 @@
 //! - `dialogue`: 対話セッション管理（Phase 2.2）
 //! - `prompt`: プロンプトエンジニアリング（Phase 2.3）
 //! - `memory`: ベクトルデータベースメモリシステム（長期記憶）
-//! - `speech`: 音声入出力（Phase 3）
 //! - `sns`: SNS連携・自動サポート（Phase 4）
 
 pub mod character;
@@ -20,7 +19,6 @@ pub mod llm;
 pub mod memory;
 pub mod prompt;
 pub mod sns;
-pub mod speech;
 // pub mod cli;        // Phase 1.3で実装
 
 pub use character::*;
@@ -30,4 +28,3 @@ pub use llm::*;
 pub use memory::*;
 pub use prompt::*;
 pub use sns::*;
-pub use speech::*;

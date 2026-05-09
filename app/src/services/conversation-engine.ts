@@ -96,13 +96,16 @@ export class ConversationEngine {
     // const response = await claudeClient.complete(prompt);
     // return response.content;
 
-    // Simulate AI response
+    // Japanese placeholder responses
     const responses = [
-      "I understand how you're feeling. It's completely normal to experience these emotions.",
-      "That sounds really challenging. I'm here for you, and we'll work through this together.",
-      "I'm so glad you shared that with me. Your feelings are valid and important.",
-      "You're doing great! Remember, I'm always here to listen and support you.",
-      "That's an interesting perspective. Let's explore that idea further together.",
+      "そうなんですね、もっと教えてください。",
+      "それは大変でしたね。私はいつもここにいますよ。",
+      "気持ちを共有してくれてありがとう。一緒に考えましょう。",
+      "あなたのその考え、とても興味深いです。もう少し詳しく聞かせてください。",
+      "そう感じるのは自然なことですよ。無理しないでくださいね。",
+      "それは素晴らしいですね！もっとそのお話聞きたいな。",
+      "うんうん、ちゃんと聞いていますよ。続きをどうぞ。",
+      "毎日お疲れ様です。何か手伝えることがあれば言ってくださいね。",
     ];
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
