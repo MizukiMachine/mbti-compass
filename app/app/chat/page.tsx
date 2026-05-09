@@ -5,37 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { createConversationEngine, ConversationContext, StreamCallbacks } from '../../src/services/conversation-engine';
 import { Message } from '../../src/types/websocket';
+import { getCharacter } from '../../src/data/mbti-characters';
 import VoiceInputButton from '../../src/components/VoiceInputButton';
 import { Suspense } from 'react';
 
 const easeOut = [0.16, 1, 0.3, 1];
-
-// MBTI type to character name mapping
-const mbtiCharacters: Record<string, { name: string; emoji: string }> = {
-  ENFP: { name: 'エネ', emoji: '✨' },
-  ENFJ: { name: 'エフィ', emoji: '🌸' },
-  ENTP: { name: 'エティ', emoji: '🌀' },
-  ENTJ: { name: 'エリ', emoji: '👑' },
-  ESFP: { name: 'エス', emoji: '🌟' },
-  ESFJ: { name: 'エサ', emoji: '🎀' },
-  ESTP: { name: 'エスティ', emoji: '⚡' },
-  ESTJ: { name: 'エスト', emoji: '🏛️' },
-  INFP: { name: 'フィ', emoji: '🌙' },
-  INFJ: { name: 'フィー', emoji: '🔮' },
-  INTP: { name: 'ティ', emoji: '🔬' },
-  INTJ: { name: 'ティー', emoji: '🎯' },
-  ISFP: { name: 'アイ', emoji: '🎨' },
-  ISFJ: { name: 'アイサ', emoji: '🏡' },
-  ISTP: { name: 'アイティ', emoji: '🔧' },
-  ISTJ: { name: 'アイエス', emoji: '📋' },
-};
 
 function ChatContent() {
   const searchParams = useSearchParams();
   const mbti = searchParams.get('mbti') || 'ENFP';
   const userName = searchParams.get('name') || 'あなた';
 
-  const character = mbtiCharacters[mbti] || mbtiCharacters['ENFP'];
+  const character = getCharacter(mbti);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -120,7 +101,7 @@ function ChatContent() {
             {character.emoji}
           </div>
           <div>
-            <h1 className="text-title-2 text-white">{character.name}</h1>
+            <h1 className="text-title-2 text-white">{character.name} - {character.japaneseName}</h1>
             <p className="text-caption text-white/40">{mbti}</p>
           </div>
         </div>
@@ -139,7 +120,7 @@ function ChatContent() {
               <div className="text-4xl mb-4">{character.emoji}</div>
               <h2 className="text-title-1 text-white mb-2">{character.name}です</h2>
               <p className="text-body text-white/60">
-                こんにちは、{userName}さん。何でも話してくださいね。
+                こんにちは、{userName}さん。{character.japaneseName}の私が、あなたにもう一つの視点もお届けしながらお話ししますね。何でも話してください。
               </p>
               <p className="text-caption text-white/30 mt-4">
                 マイクボタンで声でも入力できます

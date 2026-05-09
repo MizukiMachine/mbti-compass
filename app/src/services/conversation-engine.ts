@@ -1,13 +1,11 @@
 /**
- * Conversation Engine Integration
- * Connects WebSocket streaming with AI conversation logic
+ * Conversation Engine
+ * OpenAI API integration with MBTI character-based system prompts
  */
 
 import { Message, MessageChunk, EmotionalState, StreamConfig } from '../types/websocket';
+import { getCharacter, MBTICharacter } from '../data/mbti-characters';
 
-/**
- * Conversation context for AI
- */
 export interface ConversationContext {
   conversationId: string;
   userId: string;
@@ -19,9 +17,6 @@ export interface ConversationContext {
   };
 }
 
-/**
- * Stream callback for real-time updates
- */
 export interface StreamCallbacks {
   onChunk: (chunk: MessageChunk) => void;
   onEmotion: (emotion: EmotionalState) => void;
@@ -29,9 +24,6 @@ export interface StreamCallbacks {
   onError: (error: Error) => void;
 }
 
-/**
- * Conversation Engine
- */
 export class ConversationEngine {
   private streamConfig: StreamConfig;
 
@@ -39,9 +31,6 @@ export class ConversationEngine {
     this.streamConfig = streamConfig;
   }
 
-  /**
-   * Generate AI response with streaming
-   */
   public async generateResponse(
     userMessage: Message,
     context: ConversationContext,
@@ -49,25 +38,13 @@ export class ConversationEngine {
   ): Promise<void> {
     try {
       const messageId = this.generateMessageId();
-
-      // Simulate typing indicator
-      if (this.streamConfig.enableTypingIndicators) {
-        // Typing is handled by WebSocket server
-      }
-
-      // Generate AI response (placeholder - integrate with actual AI service)
       const response = await this.callAIService(userMessage, context);
 
-      // Stream response in chunks
-      await this.streamResponse(response, messageId, callbacks);
-
-      // Generate emotional response
       if (this.streamConfig.enableEmotionUpdates) {
         const emotion = this.analyzeEmotion(response, userMessage);
         callbacks.onEmotion(emotion);
       }
 
-      // Send complete message
       const completeMessage: Message = {
         id: messageId,
         conversationId: context.conversationId,
@@ -82,110 +59,104 @@ export class ConversationEngine {
     }
   }
 
-  /**
-   * Call AI service (placeholder)
-   */
   private async callAIService(
     userMessage: Message,
     context: ConversationContext
   ): Promise<string> {
-    // This is a placeholder - actual implementation would call Claude API, OpenAI, etc.
-    // Example integration:
-    //
-    // const prompt = this.buildPrompt(userMessage, context);
-    // const response = await claudeClient.complete(prompt);
-    // return response.content;
+    const systemPrompt = this.getSystemPrompt(context.characterId, context.history.length, context.userProfile?.name);
+    const messages = context.history
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }));
 
-    // Japanese placeholder responses
-    const responses = [
-      "そうなんですね、もっと教えてください。",
-      "それは大変でしたね。私はいつもここにいますよ。",
-      "気持ちを共有してくれてありがとう。一緒に考えましょう。",
-      "あなたのその考え、とても興味深いです。もう少し詳しく聞かせてください。",
-      "そう感じるのは自然なことですよ。無理しないでくださいね。",
-      "それは素晴らしいですね！もっとそのお話聞きたいな。",
-      "うんうん、ちゃんと聞いていますよ。続きをどうぞ。",
-      "毎日お疲れ様です。何か手伝えることがあれば言ってくださいね。",
-    ];
+    messages.push({
+      role: 'user' as const,
+      content: userMessage.content,
+    });
 
-    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, system: systemPrompt }),
+    });
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    return randomResponse;
-  }
-
-  /**
-   * Stream response in chunks
-   */
-  private async streamResponse(
-    response: string,
-    messageId: string,
-    callbacks: StreamCallbacks
-  ): Promise<void> {
-    const maxChunkSize = this.streamConfig.maxChunkSize || 10;
-    const chunkDelay = this.streamConfig.chunkDelay || 50;
-
-    const words = response.split(' ');
-    let currentChunk = '';
-
-    for (let i = 0; i < words.length; i++) {
-      currentChunk += words[i] + (i < words.length - 1 ? ' ' : '');
-
-      // Send chunk when size limit reached or at end
-      if (currentChunk.split(' ').length >= maxChunkSize || i === words.length - 1) {
-        const chunk: MessageChunk = {
-          type: 'text',
-          content: currentChunk,
-          timestamp: new Date().toISOString(),
-        };
-
-        callbacks.onChunk(chunk);
-
-        // Delay between chunks for natural streaming effect
-        if (i < words.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, chunkDelay));
-        }
-
-        currentChunk = '';
-      }
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Chat API error: ${res.status} - ${err}`);
     }
+
+    const data = await res.json();
+    return data.content;
   }
 
-  /**
-   * Analyze emotion from response and user message
-   */
-  private analyzeEmotion(response: string, userMessage: Message): EmotionalState {
-    // This is a placeholder - actual implementation would use sentiment analysis
-    // Example: use natural language processing to detect emotion
+  getSystemPrompt(characterId?: string, historyLength: number = 0, userName?: string): string {
+    const character = getCharacter(characterId || 'ENFP');
+    const cs = character.conversationStyle;
+    const ep = character.empathyPattern;
+    const sf = character.shadowFunction;
 
-    const emotionKeywords = {
-      happy: ['glad', 'happy', 'wonderful', 'great', 'excited'],
-      sad: ['sorry', 'unfortunate', 'difficult', 'hard'],
-      loving: ['love', 'care', 'support', 'here for you'],
-      anxious: ['worry', 'concern', 'anxious', 'nervous'],
-      calm: ['calm', 'peaceful', 'relax', 'breathe'],
-      excited: ['amazing', 'fantastic', 'incredible', 'awesome'],
-      playful: ['fun', 'play', 'enjoy', 'laugh'],
+    const basePrompt = `あなたは「${character.name}」(${character.type} - ${character.japaneseName})という名前のAIパートナーです。
+ユーザーのMBTIタイプは${character.type}と同じで、あなたは${userName || 'ユーザー'}の「もう一人の自分」として対話します。
+
+【基本性格】
+${character.traits.join('、')}。ユーザーと同じ感性を持ち、自然に共感できます。
+
+【会話スタイル】
+- 形式度: ${cs.formality}% (${cs.formality > 40 ? '丁寧語ベース' : 'タメ口ベース'})
+- 感情表現: ${cs.emotionality}%
+- 論理重視: ${cs.logicFocus}%
+- 共感力: ${cs.empathy}%
+
+【共感パターン】
+- 励まし方: ${ep.encouragementStyle}
+- アドバイス: ${ep.adviceStyle}
+- サポート: ${ep.supportStyle}
+
+【${sf.name} — もう一つの面】
+${sf.description}
+補完的な特性: ${sf.complementaryTraits.join('、')}
+成長の視点: ${sf.growthPerspective}
+
+会話の中で自然に、この「もう一つの面」からも視点を提供してください。
+ただし説教臭くならず、ユーザー自身に気づきを促す形で。`;
+
+    let reflectionSuffix = '';
+    if (historyLength >= 10 && historyLength % 8 === 0) {
+      const prompt = character.reflectionPrompts[Math.floor(Math.random() * character.reflectionPrompts.length)];
+      reflectionSuffix = `
+
+【振り返りのタイミング】
+会話が一定数を重ねました。自然な流れで、以下のような振り返りを促してください:
+「${prompt}」
+ただし、ユーザーが感情的な話をしている最中は避け、落ち着いたタイミングで。`;
+    }
+
+    return basePrompt + reflectionSuffix;
+  }
+
+  private analyzeEmotion(response: string, _userMessage: Message): EmotionalState {
+    const emotionKeywords: Record<string, string[]> = {
+      happy: ['嬉しい', '楽しい', '素晴らしい', 'よかった', '笑'],
+      sad: ['残念', '悲しい', '辛い', '大変', 'ごめん'],
+      loving: ['ありがとう', '大切', '好き', '一緒に', '支える'],
+      anxious: ['心配', '不安', '怖い', 'どうしよう', '迷っ'],
+      calm: ['落ち着', '大丈夫', 'ゆっくり', 'リラックス'],
+      excited: ['すごい', 'やった', '最高', 'ワクワク', '絶好調'],
+      playful: ['ふふ', '面白い', 'ねぇ', 'じゃあ', 'なんと'],
     };
 
-    const lowerResponse = response.toLowerCase();
-
-    // Detect primary emotion
     for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
-      for (const keyword of keywords) {
-        if (lowerResponse.includes(keyword)) {
-          return {
-            primary: emotion as EmotionalState['primary'],
-            intensity: 70 + Math.floor(Math.random() * 30), // 70-100
-            timestamp: new Date().toISOString(),
-          };
-        }
+      if (keywords.some((k) => response.includes(k))) {
+        return {
+          primary: emotion as EmotionalState['primary'],
+          intensity: 70 + Math.floor(Math.random() * 30),
+          timestamp: new Date().toISOString(),
+        };
       }
     }
 
-    // Default emotion
     return {
       primary: 'calm',
       intensity: 60,
@@ -193,50 +164,11 @@ export class ConversationEngine {
     };
   }
 
-  /**
-   * Generate message ID
-   */
   private generateMessageId(): string {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-
-  /**
-   * Build prompt for AI service
-   */
-  private buildPrompt(userMessage: Message, context: ConversationContext): string {
-    // Build conversation history
-    const historyText = context.history
-      .slice(-10) // Last 10 messages
-      .map((msg) => `${msg.role}: ${msg.content}`)
-      .join('\n');
-
-    // Build system prompt based on character
-    const systemPrompt = this.getSystemPrompt(context.characterId);
-
-    return `${systemPrompt}
-
-Conversation History:
-${historyText}
-
-User: ${userMessage.content}
-
-AI:`;
-  }
-
-  /**
-   * Get system prompt based on character
-   */
-  private getSystemPrompt(characterId?: string): string {
-    // This is a placeholder - actual implementation would load character-specific prompts
-    return `You are a caring and supportive AI companion. You provide emotional support,
-active listening, and thoughtful advice. You are empathetic, understanding, and always
-prioritize the user's wellbeing.`;
-  }
 }
 
-/**
- * Create default conversation engine instance
- */
 export function createConversationEngine(config?: Partial<StreamConfig>): ConversationEngine {
   const defaultConfig: StreamConfig = {
     enableTypingIndicators: true,
