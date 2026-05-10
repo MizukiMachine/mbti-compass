@@ -85,7 +85,7 @@ export class ConversationWebSocketServer {
     // Check connection limit
     if (this.clients.size >= this.config.maxConnections) {
       this.sendError(ws, 'SERVER_FULL', 'Server has reached maximum connections');
-      ws.close();
+      setTimeout(() => ws.close(), 100);
       return;
     }
 
@@ -389,7 +389,7 @@ export class ConversationWebSocketServer {
    */
   private async verifyToken(token: string): Promise<{ userId: string; conversationId: string }> {
     return new Promise((resolve, reject) => {
-      const secret = process.env.JWT_SECRET || 'your-secret-key';
+      const secret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
       jwt.verify(token, secret, (err, decoded) => {
         if (err) {

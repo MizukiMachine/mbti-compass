@@ -68,18 +68,18 @@ describe('ConversationWebSocketServer', () => {
     test('should reject connection when server is full', async () => {
       const smallServerConfig: WSServerConfig = {
         ...config,
-        port: TEST_PORT + 1,
+        port: TEST_PORT + 3,
         maxConnections: 1,
       };
 
       const smallServer = new ConversationWebSocketServer(smallServerConfig);
 
       // Create first connection
-      const client1 = new WebSocket(`ws://localhost:${TEST_PORT + 1}${TEST_PATH}`);
+      const client1 = new WebSocket(`ws://localhost:${TEST_PORT + 3}${TEST_PATH}`);
       await new Promise((resolve) => client1.on('open', resolve));
 
       // Try second connection
-      const client2 = new WebSocket(`ws://localhost:${TEST_PORT + 1}${TEST_PATH}`);
+      const client2 = new WebSocket(`ws://localhost:${TEST_PORT + 3}${TEST_PATH}`);
 
       await new Promise<void>((resolve) => {
         client2.on('message', (data: Buffer) => {
@@ -235,7 +235,7 @@ describe('ConversationWebSocketServer', () => {
           receivedChunks++;
         }
 
-        if (message.type === 'message.complete') {
+        if (message.type === 'message.complete' && message.data?.message?.role === 'assistant') {
           receivedComplete = true;
           expect(receivedTyping).toBe(true);
           expect(receivedChunks).toBeGreaterThan(0);

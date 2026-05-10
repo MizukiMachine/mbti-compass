@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getCharacter } from '../../../src/data/mbti-characters';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 const MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+
+function getOpenAIClient() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 function buildSystemPrompt(characterId: string, historyLength: number, userName?: string): string {
   const character = getCharacter(characterId);
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       typeof userName === 'string' ? userName : undefined,
     );
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: MODEL,
       messages: [
         { role: 'system', content: system },

@@ -1,152 +1,89 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getCharacter } from '../src/data/mbti-characters';
+import { shuffleQuestions, calculateMbti, MbtiQuestion } from '../src/data/mbti-questions';
 
-// Apple-style easing
 const easeOut = [0.16, 1, 0.3, 1];
+const STORAGE_KEY = 'mbti-shadow-friend-result';
 
-// Real calculation functions
-function calculateSunSign(birthDate: string): string {
-  const date = new Date(birthDate);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) { return '牡羊座'; }
-  if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) { return '牡牛座'; }
-  if ((month === 5 && day >= 21) || (month === 6 && day <= 21)) { return '双子座'; }
-  if ((month === 6 && day >= 22) || (month === 7 && day <= 22)) { return '蟹座'; }
-  if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) { return '獅子座'; }
-  if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) { return '乙女座'; }
-  if ((month === 9 && day >= 23) || (month === 10 && day <= 23)) { return '天秤座'; }
-  if ((month === 10 && day >= 24) || (month === 11 && day <= 21)) { return '蠍座'; }
-  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) { return '射手座'; }
-  if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) { return '山羊座'; }
-  if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) { return '水瓶座'; }
-  return '魚座';
+interface SavedResult {
+  type: string;
+  name: string;
+  answeredAt: string;
 }
 
-function calculateLifePathNumber(birthDate: string): number {
-  const date = new Date(birthDate);
-  let sum = date.getFullYear() + (date.getMonth() + 1) + date.getDate();
-
-  while (sum > 9 && sum !== 11 && sum !== 22 && sum !== 33) {
-    sum = sum.toString().split('').reduce((acc, digit) => acc + parseInt(digit), 0);
-  }
-
-  return sum;
-}
-
-function calculateAnimal(birthDate: string): string {
-  const animals = ['狼', '猿', '虎', '子守熊', '黒豹', 'ライオン', 'チータ', 'ペガサス', '象', 'たぬき', 'こじか', 'ひつじ'];
-  const date = new Date(birthDate);
-  const index = (date.getFullYear() + date.getMonth() + date.getDate()) % 12;
-  return animals[index];
-}
+type Step = 'landing' | 'diagnosis' | 'result';
 
 export default function Home() {
-  const [step, setStep] = useState<'landing' | 'form' | 'loading' | 'result'>('landing');
-  const [formData, setFormData] = useState({
-    name: '',
-    birthDate: '',
-    birthTime: '',
-    birthPlace: '',
-    siblingPosition: '長子',
-  });
-  const [fortuneResult, setFortuneResult] = useState<any>(null);
-  const [loadingPhase, setLoadingPhase] = useState<'calculating' | 'generating-insight' | 'creating-image' | 'finalizing'>('calculating');
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [step, setStep] = useState<Step>('landing');
+  const [name, setName] = useState('');
+  const [questions, setQuestions] = useState<MbtiQuestion[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [mbtiResult, setMbtiResult] = useState<string>('');
+  const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
 
-  const handleStartFortune = () => {
-    setStep('form');
-  };
-
-  const handleShare = async () => {
-    if (!fortuneResult) { return; }
-
-    const shareText = `私の霊獣は${fortuneResult.animal}でした！\n${fortuneResult.sunSign} · 運命数${fortuneResult.lifePathNumber}\n\n#なおちゃん #AI占い`;
-    const shareUrl = window.location.href;
-
-    // Native Web Share API (モバイル対応)
-    if (navigator.share) {
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
       try {
-        await navigator.share({
-          title: 'なおちゃん - AI占い結果',
-          text: shareText,
-          url: shareUrl,
-        });
-      } catch (error) {
-        console.log('Share cancelled or failed:', error);
+        setSavedResult(JSON.parse(saved));
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
       }
+    }
+  }, []);
+
+  const startDiagnosis = () => {
+    setQuestions(shuffleQuestions());
+    setCurrentIndex(0);
+    setAnswers({});
+    setStep('diagnosis');
+  };
+
+  const handleAnswer = (questionId: number, value: string) => {
+    const newAnswers = { ...answers, [questionId]: value };
+    setAnswers(newAnswers);
+
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
     } else {
-      // Fallback: Twitter share
-      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-      window.open(twitterUrl, '_blank', 'width=550,height=420');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStep('loading');
-    setLoadingProgress(0);
-    setLoadingPhase('calculating');
-
-    try {
-      // Phase 1: Calculating basic data (0-25%)
-      setLoadingProgress(10);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setLoadingProgress(25);
-
-      // Phase 2: Generating AI insight (25-60%)
-      setLoadingPhase('generating-insight');
-      setLoadingProgress(30);
-
-      const response = await fetch('/api/fortune', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      setLoadingProgress(60);
-
-      // Phase 3: Creating image (60-90%)
-      setLoadingPhase('creating-image');
-      const result = await response.json();
-      setLoadingProgress(90);
-
-      // Phase 4: Finalizing (90-100%)
-      setLoadingPhase('finalizing');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setLoadingProgress(100);
-
-      setFortuneResult(result);
-      setStep('result');
-    } catch (error) {
-      console.error('Fortune calculation failed:', error);
-
-      // Graceful fallback
-      setLoadingPhase('finalizing');
-      setLoadingProgress(100);
-
-      const sunSign = calculateSunSign(formData.birthDate);
-      const lifePathNumber = calculateLifePathNumber(formData.birthDate);
-      const animal = calculateAnimal(formData.birthDate);
-
-      setFortuneResult({
-        name: formData.name,
-        sunSign,
-        animal,
-        lifePathNumber,
-        siblingPosition: formData.siblingPosition,
-        insight: `あなたは${sunSign}の本質を持ち、${animal}の特性を併せ持つ、運命数${lifePathNumber}の人生を歩む方です。`,
-      });
+      const result = calculateMbti(newAnswers);
+      setMbtiResult(result);
+      const saveData: SavedResult = { type: result, name, answeredAt: new Date().toISOString() };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+      setSavedResult(saveData);
       setStep('result');
     }
   };
+
+  const goBack = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    } else {
+      setStep('landing');
+    }
+  };
+
+  const resetAll = () => {
+    setStep('landing');
+    setMbtiResult('');
+    setAnswers({});
+    setCurrentIndex(0);
+  };
+
+  const currentQuestion = questions[currentIndex];
+  const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
+
+  const displayType = mbtiResult || savedResult?.type || '';
+  const displayName = name || savedResult?.name || '';
+  const character = displayType ? getCharacter(displayType) : null;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Landing Page */}
+      {/* Landing */}
       {step === 'landing' && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -160,457 +97,280 @@ export default function Home() {
             transition={{ delay: 0.2, duration: 0.4, ease: easeOut }}
             className="font-display text-display text-white mb-4"
           >
-            なおちゃん
+            MBTI Shadow Friend
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4, ease: easeOut }}
-            className="text-body text-white/60 mb-2"
+            className="text-title-2 text-white/60 mb-2 text-center"
           >
-            Nao-chan
+            あなたの性格タイプを診断しよう
           </motion.p>
 
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.4, ease: easeOut }}
-            className="text-title-2 text-white/80 mb-24 text-center max-w-md"
+            className="text-body text-white/40 mb-12 text-center max-w-md"
           >
-            The only fortune you&apos;ll ever need.
+            20の質問に答えるだけで、あなたのMBTIタイプが分かります
           </motion.p>
 
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.4, ease: easeOut }}
-            whileHover={{ scale: 1.01, opacity: 0.9 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={handleStartFortune}
-            className="bg-accent text-black font-semibold text-body px-8 py-3 rounded-xl transition-all duration-200"
+            className="w-full max-w-sm space-y-4"
           >
-            占いを始める
-          </motion.button>
-        </motion.div>
-      )}
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="お名前"
+              className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200 text-center"
+            />
 
-      {/* Form Page */}
-      {step === 'form' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: easeOut }}
-          className="flex flex-col items-center justify-center min-h-screen px-6 py-24"
-        >
-          <div className="w-full max-w-md bg-surface border border-white/5 rounded-2xl p-12">
-            <h2 className="text-title-1 text-white mb-8">
-              あなたについて教えてください
-            </h2>
-
-            <form onSubmit={handleSubmit} className="space-y-md" aria-label="占い情報入力フォーム">
-              <div>
-                <label htmlFor="name-input" className="block text-caption text-white/60 mb-2">
-                  お名前
-                </label>
-                <input
-                  id="name-input"
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200"
-                  placeholder="太郎"
-                  aria-required="true"
-                  aria-describedby="name-help"
-                />
-                <span id="name-help" className="sr-only">お名前を入力してください</span>
-              </div>
-
-              <div>
-                <label htmlFor="birthdate-input" className="block text-caption text-white/60 mb-2">
-                  誕生日
-                </label>
-                <input
-                  id="birthdate-input"
-                  type="date"
-                  required
-                  value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200"
-                  aria-required="true"
-                  aria-describedby="birthdate-help"
-                />
-                <span id="birthdate-help" className="sr-only">誕生日を選択してください</span>
-              </div>
-
-              <div>
-                <label htmlFor="birthtime-input" className="block text-caption text-white/60 mb-2">
-                  誕生時刻（任意）
-                </label>
-                <input
-                  id="birthtime-input"
-                  type="time"
-                  value={formData.birthTime}
-                  onChange={(e) => setFormData({ ...formData, birthTime: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200"
-                  aria-required="false"
-                  aria-describedby="birthtime-help"
-                />
-                <span id="birthtime-help" className="sr-only">誕生時刻を選択してください（任意）</span>
-              </div>
-
-              <div>
-                <label htmlFor="birthplace-input" className="block text-caption text-white/60 mb-2">
-                  生まれた場所
-                </label>
-                <input
-                  id="birthplace-input"
-                  type="text"
-                  required
-                  value={formData.birthPlace}
-                  onChange={(e) => setFormData({ ...formData, birthPlace: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200"
-                  placeholder="東京都"
-                  aria-required="true"
-                  aria-describedby="birthplace-help"
-                />
-                <span id="birthplace-help" className="sr-only">生まれた場所を入力してください</span>
-              </div>
-
-              <div>
-                <label htmlFor="sibling-select" className="block text-caption text-white/60 mb-2">
-                  兄弟構成
-                </label>
-                <select
-                  id="sibling-select"
-                  value={formData.siblingPosition}
-                  onChange={(e) => setFormData({ ...formData, siblingPosition: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200"
-                  aria-describedby="sibling-help"
-                >
-                  <option value="長子">長子</option>
-                  <option value="中間子">中間子</option>
-                  <option value="末っ子">末っ子</option>
-                  <option value="一人っ子">一人っ子</option>
-                </select>
-                <span id="sibling-help" className="sr-only">兄弟構成を選択してください</span>
-              </div>
-
-              <motion.button
-                type="submit"
-                whileHover={{ scale: 1.01, opacity: 0.9 }}
-                whileTap={{ scale: 0.99 }}
-                className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 mt-8"
-              >
-                占い結果を見る
-              </motion.button>
-            </form>
-
-            <button
-              onClick={() => setStep('landing')}
-              className="mt-6 w-full text-white/40 hover:text-white/60 text-caption transition-colors"
+            <motion.button
+              whileHover={{ scale: 1.01, opacity: 0.9 }}
+              whileTap={{ scale: 0.99 }}
+              onClick={startDiagnosis}
+              disabled={!name.trim()}
+              className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              戻る
-            </button>
-          </div>
+              診断を始める
+            </motion.button>
+
+            {savedResult && (
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => {
+                  setName(savedResult.name);
+                  setMbtiResult(savedResult.type);
+                  setStep('result');
+                }}
+                className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-3 rounded-xl transition-all duration-200"
+              >
+                前回の結果を見る（{savedResult.type}）
+              </motion.button>
+            )}
+          </motion.div>
         </motion.div>
       )}
 
-      {/* Loading Page */}
-      {step === 'loading' && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center min-h-screen px-6 text-white"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          {/* Spinner */}
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-16 h-16 mb-8 rounded-full border-2 border-white/10 border-t-accent"
-          />
-
-          {/* Phase-based messages */}
-          <motion.h2
-            key={loadingPhase}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="text-title-1 mb-4"
-          >
-            {loadingPhase === 'calculating' && '基本データを計算中...'}
-            {loadingPhase === 'generating-insight' && 'AI洞察を生成中...'}
-            {loadingPhase === 'creating-image' && 'あなた専用の霊獣アートを作成中...'}
-            {loadingPhase === 'finalizing' && '最終調整中...'}
-          </motion.h2>
-
-          {/* Detailed phase description */}
-          <motion.p
-            key={`${loadingPhase}-desc`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="text-body text-white/60 text-center max-w-md mb-8"
-          >
-            {loadingPhase === 'calculating' && '星座、数秘術、動物占い、マヤ暦を統合しています'}
-            {loadingPhase === 'generating-insight' && 'GPT-4があなた専用の深い洞察を紡いでいます'}
-            {loadingPhase === 'creating-image' && 'SeeDreamがあなたの霊獣を芸術作品として描いています'}
-            {loadingPhase === 'finalizing' && 'すべての要素を統合して完璧な結果を準備しています'}
-          </motion.p>
-
-          {/* Progress Bar */}
-          <div className="w-full max-w-md mb-4">
+      {/* Diagnosis */}
+      {step === 'diagnosis' && currentQuestion && (
+        <div className="flex flex-col items-center justify-center min-h-screen px-6 py-24">
+          {/* Progress */}
+          <div className="w-full max-w-md mb-8">
+            <div className="flex justify-between text-caption text-white/40 mb-2">
+              <span>{currentIndex + 1} / {questions.length}</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
             <div className="h-1 bg-white/10 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${loadingProgress}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
                 className="h-full bg-accent rounded-full"
               />
             </div>
           </div>
 
-          {/* Progress percentage */}
-          <motion.p
-            key={loadingProgress}
-            initial={{ opacity: 0.5 }}
-            animate={{ opacity: 1 }}
-            className="text-caption text-white/40"
-          >
-            {loadingProgress}%
-          </motion.p>
-        </motion.div>
+          {/* Question Card */}
+          <div className="w-full max-w-md">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentQuestion.id}
+                initial={{ opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                transition={{ duration: 0.3, ease: easeOut }}
+                className="bg-surface border border-white/5 rounded-2xl p-12"
+              >
+                <h2 className="text-title-1 text-white text-center mb-10">
+                  {currentQuestion.question}
+                </h2>
+
+                <div className="space-y-4">
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionA.value)}
+                    className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
+                      answers[currentQuestion.id] === currentQuestion.optionA.value
+                        ? 'bg-accent text-black font-semibold'
+                        : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
+                    }`}
+                  >
+                    {currentQuestion.optionA.label}
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionB.value)}
+                    className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
+                      answers[currentQuestion.id] === currentQuestion.optionB.value
+                        ? 'bg-accent text-black font-semibold'
+                        : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
+                    }`}
+                  >
+                    {currentQuestion.optionB.label}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            <button
+              onClick={goBack}
+              className="mt-6 w-full text-white/40 hover:text-white/60 text-caption transition-colors text-center"
+            >
+              ← 戻る
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Result Page */}
-      {step === 'result' && fortuneResult && (
+      {/* Result */}
+      {step === 'result' && character && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, ease: easeOut }}
           className="min-h-screen px-6 py-24"
         >
-          <div className="max-w-3xl mx-auto">
-            {/* Hero - Big Reveal */}
+          <div className="max-w-2xl mx-auto">
+            {/* Hero */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.6, ease: easeOut }}
-              className="text-center mb-24"
+              className="text-center mb-16"
             >
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.4, ease: easeOut }}
+                transition={{ delay: 0.3, duration: 0.4, ease: easeOut }}
                 className="text-caption text-white/40 mb-4 uppercase tracking-wider"
               >
-                {fortuneResult.name}
-              </motion.p>
+                {displayName}
+              </motion.div>
 
-              {/* Generated Animal Image */}
-              {fortuneResult.imageUrl && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5, duration: 0.8, ease: easeOut }}
-                  className="mb-8 flex justify-center"
-                >
-                  <div className="relative rounded-3xl overflow-hidden border-2 border-accent/20 shadow-2xl max-w-md">
-                    <img
-                      src={fortuneResult.imageUrl}
-                      alt={`Your spirit animal: ${fortuneResult.animal}`}
-                      className="w-full h-auto"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-                  </div>
-                </motion.div>
-              )}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4, duration: 0.5, ease: easeOut }}
+                className="text-6xl mb-6"
+              >
+                {character.emoji}
+              </motion.div>
 
               <motion.h1
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.6, ease: easeOut }}
-                className="font-display text-[64px] leading-tight text-white mb-6"
+                transition={{ delay: 0.5, duration: 0.4, ease: easeOut }}
+                className="font-display text-[72px] leading-tight text-white mb-4"
               >
-                You are a<br />
-                <span className="text-accent">{fortuneResult.animal}</span>
+                {displayType}
               </motion.h1>
 
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8, duration: 0.4, ease: easeOut }}
-                className="text-title-2 text-white/60"
+                transition={{ delay: 0.6, duration: 0.4, ease: easeOut }}
+                className="text-title-2 text-accent mb-4"
               >
-                {fortuneResult.sunSign} · 運命数 {fortuneResult.lifePathNumber}
+                {character.name} — {character.japaneseName}
+              </motion.p>
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.7, duration: 0.4 }}
+                className="text-body text-white/60"
+              >
+                {character.traits.join('・')}
               </motion.p>
             </motion.div>
 
-            {/* Insight Story */}
+            {/* Shadow Function */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.0, duration: 0.6, ease: easeOut }}
+              transition={{ delay: 0.9, duration: 0.6, ease: easeOut }}
               className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
             >
-              <p className="text-body text-white/80 leading-relaxed whitespace-pre-line">
-                {fortuneResult.insight}
+              <h2 className="text-title-1 text-white mb-4">
+                影の機能：{character.shadowFunction.name}
+              </h2>
+              <p className="text-body text-white/70 leading-relaxed mb-4">
+                {character.shadowFunction.description}
+              </p>
+              <p className="text-body text-accent/80">
+                成長のヒント：{character.shadowFunction.growthPerspective}
               </p>
             </motion.div>
 
-            {/* Stats Grid */}
+            {/* Reflection Prompts */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2, duration: 0.6, ease: easeOut }}
-              className="grid grid-cols-3 gap-4 mb-12"
+              transition={{ delay: 1.1, duration: 0.6, ease: easeOut }}
+              className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
             >
-              <div className="bg-surface-elevated rounded-xl p-6 text-center">
-                <p className="text-caption text-white/40 mb-2">星座</p>
-                <p className="text-title-2 text-white">{fortuneResult.sunSign}</p>
-              </div>
-
-              <div className="bg-surface-elevated rounded-xl p-6 text-center">
-                <p className="text-caption text-white/40 mb-2">運命数</p>
-                <p className="text-title-2 text-white">{fortuneResult.lifePathNumber}</p>
-              </div>
-
-              <div className="bg-surface-elevated rounded-xl p-6 text-center">
-                <p className="text-caption text-white/40 mb-2">兄弟</p>
-                <p className="text-title-2 text-white">{fortuneResult.siblingPosition}</p>
+              <h2 className="text-title-1 text-white mb-6">振り返りのヒント</h2>
+              <div className="space-y-4">
+                {character.reflectionPrompts.map((prompt, i) => (
+                  <div key={i} className="bg-surface-elevated rounded-xl p-4">
+                    <p className="text-body text-white/70">{prompt}</p>
+                  </div>
+                ))}
               </div>
             </motion.div>
-
-            {/* Mayan Calendar Section */}
-            {fortuneResult.mayan && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.4, duration: 0.6, ease: easeOut }}
-                className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
-              >
-                <h2 className="text-title-1 text-white mb-8">マヤ暦</h2>
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <p className="text-caption text-white/40 mb-2">Kin番号</p>
-                    <p className="text-[48px] font-display text-accent">{fortuneResult.mayan.kin}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-caption text-white/40 mb-2">太陽の紋章</p>
-                    <p className="text-title-2 text-white">{fortuneResult.mayan.seal}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-caption text-white/40 mb-2">銀河の音</p>
-                    <p className="text-[48px] font-display text-accent">{fortuneResult.mayan.tone}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Horoscope Details Table */}
-            {fortuneResult.horoscope && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.6, duration: 0.6, ease: easeOut }}
-                className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
-              >
-                <h2 className="text-title-1 text-white mb-8">ホロスコープ詳細</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(fortuneResult.horoscope).map(([planet, sign]: [string, unknown]) => (
-                    <div key={planet} className="flex justify-between items-center bg-surface-elevated rounded-xl p-4">
-                      <span className="text-body text-white/60">{planet}</span>
-                      <span className="text-body text-white font-semibold">{String(sign)}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-            {/* Timeline Section */}
-            {fortuneResult.timeline && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.8, duration: 0.6, ease: easeOut }}
-                className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
-              >
-                <h2 className="text-title-1 text-white mb-8">あなたの人生タイムライン</h2>
-
-                {/* Past 10 Years */}
-                <div className="mb-8">
-                  <h3 className="text-title-2 text-white/80 mb-4">過去10年</h3>
-                  <div className="space-y-3">
-                    {fortuneResult.timeline.past.map((entry: any) => (
-                      <div key={entry.year} className="flex items-start gap-4 bg-surface-elevated rounded-xl p-4">
-                        <div className="text-center min-w-[80px]">
-                          <p className="text-caption text-white/40">{entry.year}年</p>
-                          <p className="text-body text-white">{entry.age}歳</p>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-body text-accent mb-1">{entry.theme}</p>
-                          <p className="text-caption text-white/60">{entry.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Present */}
-                <div className="mb-8">
-                  <h3 className="text-title-2 text-white/80 mb-4">現在</h3>
-                  <div className="bg-accent/10 border border-accent/20 rounded-xl p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="text-center min-w-[80px]">
-                        <p className="text-caption text-accent">{fortuneResult.timeline.present.year}年</p>
-                        <p className="text-title-2 text-accent">{fortuneResult.timeline.present.age}歳</p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-title-2 text-white mb-2">{fortuneResult.timeline.present.theme}</p>
-                        <p className="text-body text-white/80">{fortuneResult.timeline.present.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Future 10 Years */}
-                <div>
-                  <h3 className="text-title-2 text-white/80 mb-4">未来10年</h3>
-                  <div className="space-y-3">
-                    {fortuneResult.timeline.future.map((entry: any) => (
-                      <div key={entry.year} className="flex items-start gap-4 bg-surface-elevated rounded-xl p-4">
-                        <div className="text-center min-w-[80px]">
-                          <p className="text-caption text-white/40">{entry.year}年</p>
-                          <p className="text-body text-white">{entry.age}歳</p>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-body text-accent mb-1">{entry.theme}</p>
-                          <p className="text-caption text-white/60">{entry.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
 
             {/* Actions */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1.4, duration: 0.4, ease: easeOut }}
+              transition={{ delay: 1.3, duration: 0.4 }}
               className="flex flex-col gap-4"
             >
               <motion.button
                 whileHover={{ scale: 1.01, opacity: 0.9 }}
                 whileTap={{ scale: 0.99 }}
-                onClick={handleShare}
+                onClick={() => {
+                  const params = new URLSearchParams({ name: displayName, mbti: displayType });
+                  window.location.href = `/chat?${params.toString()}`;
+                }}
                 className="w-full bg-accent text-black font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
-                aria-label="結果をシェアする"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                AIと話す
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={async () => {
+                  const shareText = `私のMBTIタイプは${displayType}（${character.japaneseName}）でした！\n\n#MBTIShadowFriend #MBTI #${displayType}`;
+                  const shareUrl = window.location.href;
+
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({ title: 'MBTI Shadow Friend - 診断結果', text: shareText, url: shareUrl });
+                    } catch {}
+                  } else {
+                    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+                    window.open(twitterUrl, '_blank', 'width=550,height=420');
+                  }
+                }}
+                className="w-full bg-surface border border-white/10 text-white/80 font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3"></circle>
@@ -623,39 +383,12 @@ export default function Home() {
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.01, opacity: 0.9 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  const animalToMbti: Record<string, string> = {
-                    '狼': 'INTJ', '猿': 'ENTP', '虎': 'ESTP', '子守熊': 'ISFJ',
-                    '黒豹': 'INFJ', 'ライオン': 'ENTJ', 'チータ': 'ESTP', 'ペガサス': 'ENFP',
-                    '象': 'ISTJ', 'たぬき': 'ESFP', 'こじか': 'INFP', 'ひつじ': 'ISFP',
-                  };
-                  const mbti = animalToMbti[fortuneResult.animal] || 'ENFP';
-                  const params = new URLSearchParams({ name: fortuneResult.name || '', mbti });
-                  window.location.href = `/chat?${params.toString()}`;
-                }}
-                className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
-                aria-label="AIと話す"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                AIと話す
-              </motion.button>
-
-              <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  setStep('landing');
-                  setFortuneResult(null);
-                  setFormData({ name: '', birthDate: '', birthTime: '', birthPlace: '', siblingPosition: '長子' });
-                }}
+                onClick={resetAll}
                 className="w-full text-white/40 hover:text-white/60 text-body py-2 transition-colors"
-                aria-label="最初に戻る"
               >
-                戻る
+                もう一度診断する
               </motion.button>
             </motion.div>
           </div>

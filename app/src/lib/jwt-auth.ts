@@ -1,9 +1,9 @@
 /**
  * JWT Authentication Utilities for WebSocket Connections
- * AI Girlfriend Platform
  */
 
-import * as jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 
 /**
  * JWT Payload structure
@@ -48,11 +48,13 @@ export function generateToken(userId: string, conversationId: string): string {
     conversationId,
   };
 
-  return jwt.sign(payload, config.secret, {
-    expiresIn: config.expiresIn,
-    issuer: config.issuer,
-    audience: config.audience,
-  });
+  const options: SignOptions = {
+    expiresIn: config.expiresIn as StringValue | number,
+  };
+  if (config.issuer) options.issuer = config.issuer;
+  if (config.audience) options.audience = config.audience;
+
+  return jwt.sign(payload, config.secret, options);
 }
 
 /**
