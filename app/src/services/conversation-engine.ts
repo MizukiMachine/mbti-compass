@@ -1,6 +1,6 @@
 /**
  * Conversation Engine
- * Client-side engine that communicates with server-side AI via /api/chat
+ * Client-side engine that communicates with server-side AI via /api/chat (SSE streaming)
  */
 
 import { Message, MessageChunk, EmotionalState, StreamConfig } from '../types/websocket';
@@ -37,10 +37,10 @@ export class ConversationEngine {
   ): Promise<void> {
     try {
       const messageId = this.generateMessageId();
-      const response = await this.callAIService(context);
+      const fullText = await this.callAIService(context, callbacks);
 
       if (this.streamConfig.enableEmotionUpdates) {
-        const emotion = this.analyzeEmotion(response);
+        const emotion = this.analyzeEmotion(fullText);
         callbacks.onEmotion(emotion);
       }
 
@@ -48,7 +48,7 @@ export class ConversationEngine {
         id: messageId,
         conversationId: context.conversationId,
         role: 'assistant',
-        content: response,
+        content: fullText,
         timestamp: new Date().toISOString(),
       };
 
@@ -58,8 +58,10 @@ export class ConversationEngine {
     }
   }
 
-  private async callAIService(context: ConversationContext): Promise<string> {
-    // history already includes the latest user message — no need to push again
+  private async callAIService(
+    context: ConversationContext,
+    callbacks: StreamCallbacks
+  ): Promise<string> {
     const messages = context.history
       .slice(-10)
       .map((msg) => ({
@@ -74,7 +76,7 @@ export class ConversationEngine {
         messages,
         characterId: context.characterId || 'ENFP',
         historyLength: context.history.length,
-        userName: context.userProfile?.name,
+        userName: context.userProfile?.name || context.userId,
       }),
     });
 
@@ -83,8 +85,50 @@ export class ConversationEngine {
       throw new Error(`Chat API error: ${res.status} - ${err}`);
     }
 
-    const data = await res.json();
-    return data.content;
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        const data = trimmed.slice(6);
+        if (data === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+          if (parsed.text) {
+            fullText += parsed.text;
+            callbacks.onChunk({
+              type: 'text',
+              content: parsed.text,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          if (e instanceof Error && !e.message.includes('Unexpected')) {
+            throw e;
+          }
+        }
+      }
+    }
+
+    return fullText;
   }
 
   private analyzeEmotion(response: string): EmotionalState {

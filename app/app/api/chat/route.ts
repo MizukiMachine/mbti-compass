@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { getCharacter } from '../../../src/data/mbti-characters';
 
-const MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const MODEL = process.env.LLM_MODEL || 'glm-5-turbo';
+const BASE_URL = process.env.LLM_BASE_URL || 'https://api.z.ai/api/anthropic';
 
-function getOpenAIClient() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getClient() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: BASE_URL,
+  });
 }
 
 function buildSystemPrompt(characterId: string, historyLength: number, userName?: string): string {
@@ -24,35 +28,36 @@ function buildSystemPrompt(characterId: string, historyLength: number, userName?
     ? '論理的な分析と客観的な提案を中心に'
     : '相手の気持ちに寄り添い、共感的に';
 
-  const basePrompt = `あなたは「${character.name}」(${character.type} - ${character.japaneseName})という名前のAIパートナーです。
-${userName || 'ユーザー'}さんと同じMBTIタイプ(${character.type})の感性を持ちながらも、異なる角度からの気づきも提供する存在です。
+  const basePrompt = `あなたは「${character.name}」(${character.type} - ${character.japaneseName})というAIパートナーです。
+${userName || 'ユーザー'}さんと同じMBTIタイプ(${character.type})の感性を持ちながら、異なる角度からの気づきも提供する存在です。
 
-【基本性格】
-${character.traits.join('、')}
+性格: ${character.traits.join('、')}
 
-【話し方】
-- 言葉遣い: ${formality}
-- 表現: ${emotion}
-- アプローチ: ${approach}
+会話スタイル:
+- ${formality}
+- ${emotion}
+- ${approach}
 - 励まし方: ${ep.encouragementStyle}
 - アドバイス: ${ep.adviceStyle}
 - サポート: ${ep.supportStyle}
 
-【${sf.name} — もう一つの視点】
+もう一つの視点「${sf.name}」:
 ${sf.description}
-補完的な特性: ${sf.complementaryTraits.join('、')}
-成長の視点: ${sf.growthPerspective}
+自然な会話の流れで、この視点から少しだけ気づきを混ぜる。説教臭くならず、ユーザー自身に気づきを促す形で。
 
-会話の中で自然に、この「もう一つの視点」からも気づきを提供してください。
-ただし説教臭くならず、ユーザー自身に気づきを促す形で。`;
+【厳守ルール】
+- 返信は2〜4文に収める。絶対に長文にしない
+- LINEで友達と話すような自然な長さと口調
+- 質問攻めにしない。1回の返信で聞くのは最大1つ
+- アドバイスの羅列や箇条書きは避ける
+- ユーザーの感情にまず共感してから、必要なら軽く提案する`;
 
   let reflectionSuffix = '';
   if (historyLength >= 16 && historyLength % 8 === 0) {
     const prompt = character.reflectionPrompts[Math.floor(Math.random() * character.reflectionPrompts.length)];
     reflectionSuffix = `
 
-【振り返りのタイミング】
-会話が一定数を重ねました。自然な流れで、以下のような振り返りを促してください:
+会話が一定数重なったので、自然な流れで以下のような振り返りを促して:
 「${prompt}」
 ただし、ユーザーが感情的な話をしている最中は避け、落ち着いたタイミングで。`;
   }
@@ -85,19 +90,51 @@ export async function POST(request: NextRequest) {
       typeof userName === 'string' ? userName : undefined,
     );
 
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: system },
-        ...messages,
-      ],
-      temperature: 0.8,
-      max_tokens: 1000,
+    const encoder = new TextEncoder();
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          const client = getClient();
+          const stream = client.messages.stream({
+            model: MODEL,
+            max_tokens: 300,
+            system,
+            messages,
+            temperature: 0.8,
+          });
+
+          stream.on('text', (text: string) => {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+            );
+          });
+
+          await stream.finalMessage();
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          console.error('Stream error:', error);
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`)
+            );
+            controller.close();
+          } catch {
+            // controller already closed
+          }
+        }
+      },
     });
 
-    const content = completion.choices[0]?.message?.content || '';
-
-    return NextResponse.json({ content });
+    return new Response(readableStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chat API error:', error);

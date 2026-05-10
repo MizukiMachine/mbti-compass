@@ -21,7 +21,8 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const engine = useRef(createConversationEngine());
 
@@ -31,10 +32,10 @@ function ChatContent() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping]);
+  }, [messages, streamingText]);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || isStreaming) return;
 
     const userMessage: Message = {
       id: `msg_${Date.now()}_user`,
@@ -44,26 +45,32 @@ function ChatContent() {
       timestamp: new Date().toISOString(),
     };
 
-    // Update ref synchronously to avoid stale closure in async callbacks
     messagesRef.current = [...messagesRef.current, userMessage];
     setMessages([...messagesRef.current]);
     setInputText('');
-    setIsTyping(true);
+    setIsStreaming(true);
+    setStreamingText('');
 
     const context: ConversationContext = {
       conversationId: 'chat',
       userId: userName,
       characterId: mbti,
       history: messagesRef.current,
+      userProfile: { name: userName },
     };
 
     const callbacks: StreamCallbacks = {
-      onChunk: () => {},
+      onChunk: (chunk) => {
+        if (chunk.type === 'text') {
+          setStreamingText(prev => prev + chunk.content);
+        }
+      },
       onEmotion: () => {},
       onComplete: (message: Message) => {
         messagesRef.current = [...messagesRef.current, message];
         setMessages([...messagesRef.current]);
-        setIsTyping(false);
+        setIsStreaming(false);
+        setStreamingText('');
       },
       onError: () => {
         const errorMsg: Message = {
@@ -75,12 +82,13 @@ function ChatContent() {
         };
         messagesRef.current = [...messagesRef.current, errorMsg];
         setMessages([...messagesRef.current]);
-        setIsTyping(false);
+        setIsStreaming(false);
+        setStreamingText('');
       },
     };
 
     engine.current.generateResponse(userMessage, context, callbacks);
-  }, [mbti, userName]);
+  }, [mbti, userName, isStreaming]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,8 +122,7 @@ function ChatContent() {
       {/* Messages */}
       <main className="flex-1 overflow-y-auto px-6 py-8">
         <div className="max-w-2xl mx-auto space-y-6">
-          {/* Welcome message */}
-          {messages.length === 0 && (
+          {messages.length === 0 && !isStreaming && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -154,8 +161,21 @@ function ChatContent() {
             ))}
           </AnimatePresence>
 
-          {/* Typing indicator */}
-          {isTyping && (
+          {/* Streaming text */}
+          {isStreaming && streamingText && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="max-w-[80%] px-5 py-3 rounded-2xl bg-surface border border-white/5 text-white/90 rounded-bl-md">
+                <p className="text-body leading-relaxed">{streamingText}<span className="inline-block w-0.5 h-4 bg-white/60 animate-pulse ml-0.5" /></p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Typing indicator (waiting for first token) */}
+          {isStreaming && !streamingText && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -203,7 +223,7 @@ function ChatContent() {
             type="submit"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || isStreaming}
             className="w-11 h-11 flex items-center justify-center rounded-xl bg-accent text-black disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
             aria-label="送信"
           >
