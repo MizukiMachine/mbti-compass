@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface VoiceInputButtonProps {
   onTranscript: (text: string) => void;
@@ -10,6 +10,11 @@ interface VoiceInputButtonProps {
 
 export default function VoiceInputButton({ onTranscript }: VoiceInputButtonProps) {
   const { isListening, transcript, error, isSupported, startListening, stopListening, resetTranscript } = useSpeechRecognition();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (transcript && !isListening) {
@@ -18,7 +23,10 @@ export default function VoiceInputButton({ onTranscript }: VoiceInputButtonProps
     }
   }, [transcript, isListening, onTranscript, resetTranscript]);
 
-  if (!isSupported) return null;
+  // Always render placeholder on server to match client structure
+  if (!mounted || !isSupported) {
+    return <div className="relative w-11 h-11" />;
+  }
 
   const handleClick = () => {
     if (isListening) {

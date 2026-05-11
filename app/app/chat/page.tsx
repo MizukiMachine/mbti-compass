@@ -7,6 +7,7 @@ import { createConversationEngine, ConversationContext, StreamCallbacks } from '
 import { Message } from '../../src/types/websocket';
 import { getCharacter } from '../../src/data/mbti-characters';
 import VoiceInputButton from '../../src/components/VoiceInputButton';
+import { createClient } from '../../src/lib/supabase/client';
 import { Suspense } from 'react';
 
 const easeOut = [0.16, 1, 0.3, 1];
@@ -25,6 +26,7 @@ function ChatContent() {
   const [streamingText, setStreamingText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const engine = useRef(createConversationEngine());
+  const conversationIdRef = useRef<string>('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,6 +35,94 @@ function ChatContent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, streamingText]);
+
+  // Load chat history from Supabase
+  useEffect(() => {
+    const loadHistory = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Get or create conversation
+      let { data: conv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('character_id', mbti)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!conv) {
+        const { data: newConv } = await supabase
+          .from('conversations')
+          .insert({ user_id: session.user.id, character_id: mbti })
+          .select('id')
+          .single();
+        conv = newConv;
+      }
+
+      if (!conv) return;
+      conversationIdRef.current = conv.id;
+
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conv.id)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (msgs && msgs.length > 0) {
+        const loaded: Message[] = msgs.map(m => ({
+          id: m.id,
+          conversationId: m.conversation_id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at,
+        }));
+        messagesRef.current = loaded;
+        setMessages(loaded);
+      }
+    };
+
+    loadHistory();
+  }, [mbti]);
+
+  const saveMessage = useCallback(async (message: Message) => {
+    if (!conversationIdRef.current) return;
+    const supabase = createClient();
+    await supabase.from('messages').insert({
+      conversation_id: conversationIdRef.current,
+      role: message.role,
+      content: message.content,
+    });
+  }, []);
+
+  const cleanupOldMessages = useCallback(async () => {
+    if (!conversationIdRef.current) return;
+    const supabase = createClient();
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationIdRef.current);
+
+    if (count && count > 50) {
+      // Delete oldest messages beyond 50
+      const { data: oldMsgs } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationIdRef.current)
+        .order('created_at', { ascending: true })
+        .limit(count - 50);
+
+      if (oldMsgs && oldMsgs.length > 0) {
+        await supabase
+          .from('messages')
+          .delete()
+          .in('id', oldMsgs.map(m => m.id));
+      }
+    }
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
@@ -50,6 +140,8 @@ function ChatContent() {
     setInputText('');
     setIsStreaming(true);
     setStreamingText('');
+
+    saveMessage(userMessage);
 
     const context: ConversationContext = {
       conversationId: 'chat',
@@ -71,6 +163,8 @@ function ChatContent() {
         setMessages([...messagesRef.current]);
         setIsStreaming(false);
         setStreamingText('');
+        saveMessage(message);
+        cleanupOldMessages();
       },
       onError: () => {
         const errorMsg: Message = {
@@ -88,7 +182,7 @@ function ChatContent() {
     };
 
     engine.current.generateResponse(userMessage, context, callbacks);
-  }, [mbti, userName, isStreaming]);
+  }, [mbti, userName, isStreaming, saveMessage, cleanupOldMessages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,7 +268,7 @@ function ChatContent() {
             </motion.div>
           )}
 
-          {/* Typing indicator (waiting for first token) */}
+          {/* Typing indicator */}
           {isStreaming && !streamingText && (
             <motion.div
               initial={{ opacity: 0 }}

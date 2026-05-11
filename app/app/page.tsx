@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { getCharacter } from '../src/data/mbti-characters';
 import { shuffleQuestions, calculateMbti, MbtiQuestion } from '../src/data/mbti-questions';
+import { createClient } from '../src/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 const easeOut = [0.16, 1, 0.3, 1];
 const STORAGE_KEY = 'mbti-shadow-friend-result';
@@ -24,16 +26,54 @@ export default function Home() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [mbtiResult, setMbtiResult] = useState<string>('');
   const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
+  // Auth + saved result loading
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setSavedResult(JSON.parse(saved));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
+    const supabase = createClient();
+
+    const loadData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        // Try loading from Supabase first
+        const { data } = await supabase
+          .from('diagnosis_results')
+          .select('mbti_type, answered_at')
+          .eq('user_id', currentUser.id)
+          .order('answered_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          const displayName = currentUser.user_metadata?.display_name || '';
+          setSavedResult({ type: data.mbti_type, name: displayName, answeredAt: data.answered_at });
+          setName(displayName);
+          return;
+        }
       }
-    }
+
+      // Fallback to localStorage
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          setSavedResult(JSON.parse(saved));
+        } catch {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    };
+
+    loadData();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const startDiagnosis = () => {
@@ -53,10 +93,42 @@ export default function Home() {
       const result = calculateMbti(newAnswers);
       setMbtiResult(result);
       const saveData: SavedResult = { type: result, name, answeredAt: new Date().toISOString() };
+
+      // Save to localStorage (always)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
       setSavedResult(saveData);
+
+      // Save to Supabase (if logged in)
+      if (user) {
+        const supabase = createClient();
+        supabase.from('diagnosis_results').insert({
+          user_id: user.id,
+          mbti_type: result,
+        }).then(({ error }) => {
+          if (error) console.error('Failed to save diagnosis:', error);
+        });
+      }
+
       setStep('result');
     }
+  };
+
+  // Migrate localStorage data to Supabase after login
+  const migrateLocalStorage = async (userId: string) => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    try {
+      const { type } = JSON.parse(saved);
+      if (/^[EI][SN][TF][JP]$/.test(type)) {
+        const supabase = createClient();
+        await supabase.from('diagnosis_results').insert({
+          user_id: userId,
+          mbti_type: type,
+        });
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {}
   };
 
   const goBack = () => {
@@ -72,6 +144,12 @@ export default function Home() {
     setMbtiResult('');
     setAnswers({});
     setCurrentIndex(0);
+  };
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUser(null);
   };
 
   const currentQuestion = questions[currentIndex];
@@ -117,6 +195,27 @@ export default function Home() {
           >
             20の質問に答えるだけで、あなたのMBTIタイプが分かります
           </motion.p>
+
+          {/* Auth status */}
+          {user ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-caption text-white/30 mb-4"
+            >
+              {user.email} でログイン中{' '}
+              <button onClick={handleLogout} className="text-accent hover:underline">ログアウト</button>
+            </motion.p>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex gap-4 mb-6 text-caption"
+            >
+              <a href="/auth/login" className="text-white/40 hover:text-accent">ログイン</a>
+              <a href="/auth/signup" className="text-white/40 hover:text-accent">新規登録</a>
+            </motion.div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -182,48 +281,45 @@ export default function Home() {
 
           {/* Question Card */}
           <div className="w-full max-w-md">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentQuestion.id}
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -40 }}
-                transition={{ duration: 0.3, ease: easeOut }}
-                className="bg-surface border border-white/5 rounded-2xl p-12"
-              >
-                <h2 className="text-title-1 text-white text-center mb-10">
-                  {currentQuestion.question}
-                </h2>
+            <motion.div
+              key={currentQuestion.id}
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, ease: easeOut }}
+              className="bg-surface border border-white/5 rounded-2xl p-12"
+            >
+              <h2 className="text-title-1 text-white text-center mb-10">
+                {currentQuestion.question}
+              </h2>
 
-                <div className="space-y-4">
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionA.value)}
-                    className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
-                      answers[currentQuestion.id] === currentQuestion.optionA.value
-                        ? 'bg-accent text-black font-semibold'
-                        : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
-                    }`}
-                  >
-                    {currentQuestion.optionA.label}
-                  </motion.button>
+              <div className="space-y-4">
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionA.value)}
+                  className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
+                    answers[currentQuestion.id] === currentQuestion.optionA.value
+                      ? 'bg-accent text-black font-semibold'
+                      : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
+                  }`}
+                >
+                  {currentQuestion.optionA.label}
+                </motion.button>
 
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionB.value)}
-                    className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
-                      answers[currentQuestion.id] === currentQuestion.optionB.value
-                        ? 'bg-accent text-black font-semibold'
-                        : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
-                    }`}
-                  >
-                    {currentQuestion.optionB.label}
-                  </motion.button>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAnswer(currentQuestion.id, currentQuestion.optionB.value)}
+                  className={`w-full px-6 py-4 rounded-xl text-left transition-all duration-200 ${
+                    answers[currentQuestion.id] === currentQuestion.optionB.value
+                      ? 'bg-accent text-black font-semibold'
+                      : 'bg-black/40 border border-white/10 text-white hover:border-accent/40'
+                  }`}
+                >
+                  {currentQuestion.optionB.label}
+                </motion.button>
+              </div>
+            </motion.div>
 
             <button
               onClick={goBack}
