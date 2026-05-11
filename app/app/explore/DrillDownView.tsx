@@ -36,8 +36,6 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
   const shadowGrowth = character.shadowFunction.growthPerspective;
   const reflectionPrompts = character.reflectionPrompts.slice(0, 2);
 
-  const chatUrl = `/chat?mbti=${mbtiType}${userName ? `&name=${encodeURIComponent(userName)}` : ''}`;
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
@@ -123,7 +121,7 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
         {/* Shadow growth perspective */}
         <div>
           <h3 className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase mb-2">
-            シャドウの成長視点
+            シャドウの成長視角
           </h3>
           <div
             className="rounded-xl p-4 backdrop-blur-sm"
@@ -156,20 +154,6 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Chat button */}
-      <div className="px-5 pb-6 pt-2 shrink-0">
-        <a
-          href={chatUrl}
-          className="block w-full py-3 rounded-xl text-center text-[13px] font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98]"
-          style={{
-            background: `linear-gradient(135deg, ${card.color} 0%, ${card.color}BB 100%)`,
-            boxShadow: `0 4px 20px ${card.color}30`,
-          }}
-        >
-          この特性について話す
-        </a>
       </div>
     </div>
   );

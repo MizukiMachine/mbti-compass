@@ -27,13 +27,6 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // /chatはログイン必須
-  if (request.nextUrl.pathname.startsWith('/chat') && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/auth/login';
-    return NextResponse.redirect(url);
-  }
-
   // ログイン済みユーザーがauthページにアクセスしたらトップへ
   if (user && request.nextUrl.pathname.startsWith('/auth/')) {
     const url = request.nextUrl.clone();
