@@ -5,18 +5,18 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'MBTI Shadow Friend - あなたの影と対話するAI',
+  title: 'シャドウフレンドAI - あなたの影と対話するAI',
   description: '20の質問でMBTIタイプを診断。あなたと同じ性格のAIが、自分では気づかない偏り（シャドウ機能）を代弁してくれます。',
-  keywords: 'MBTI, 性格診断, シャドウ機能, AIチャット, MBTI Shadow Friend',
+  keywords: 'MBTI, 性格診断, シャドウ機能, AIチャット, シャドウフレンドAI',
   openGraph: {
-    title: 'MBTI Shadow Friend - あなたの影と対話するAI',
+    title: 'シャドウフレンドAI - あなたの影と対話するAI',
     description: 'あなたと同じ性格のAIが、自分の見えない部分（シャドウ）を代弁。',
     type: 'website',
     locale: 'ja_JP',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MBTI Shadow Friend - あなたの影と対話するAI',
+    title: 'シャドウフレンドAI - あなたの影と対話するAI',
     description: 'あなたと同じ性格のAIが、自分の見えない部分（シャドウ）を代弁。',
   },
 };

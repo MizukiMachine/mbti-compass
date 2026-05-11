@@ -10,6 +10,14 @@ import type { User } from '@supabase/supabase-js';
 const easeOut = [0.16, 1, 0.3, 1];
 const STORAGE_KEY = 'mbti-shadow-friend-result';
 
+const toDummyEmail = (name: string) => {
+  if (/^[a-zA-Z0-9._-]+$/.test(name)) return `${name}@shadowfriend.app`;
+  const hex = Array.from(new TextEncoder().encode(name))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${hex}@shadowfriend.app`;
+};
+
 interface SavedResult {
   type: string;
   name: string;
@@ -17,6 +25,7 @@ interface SavedResult {
 }
 
 type Step = 'landing' | 'diagnosis' | 'result';
+type AuthPhase = 'name' | 'password';
 
 export default function Home() {
   const [step, setStep] = useState<Step>('landing');
@@ -27,6 +36,11 @@ export default function Home() {
   const [mbtiResult, setMbtiResult] = useState<string>('');
   const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [authPhase, setAuthPhase] = useState<AuthPhase>('name');
+  const [authName, setAuthName] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   // Auth + saved result loading
   useEffect(() => {
@@ -38,6 +52,8 @@ export default function Home() {
       setUser(currentUser);
 
       if (currentUser) {
+        const displayName = currentUser.user_metadata?.display_name || '';
+        setName(displayName);
         // Try loading from Supabase first
         const { data } = await supabase
           .from('diagnosis_results')
@@ -81,6 +97,48 @@ export default function Home() {
     setCurrentIndex(0);
     setAnswers({});
     setStep('diagnosis');
+  };
+
+  const handleAuthSubmit = async () => {
+    setAuthError('');
+    setAuthLoading(true);
+    const supabase = createClient();
+    const dummyEmail = toDummyEmail(authName);
+
+    // Try login first
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: dummyEmail,
+      password: authPassword,
+    });
+
+    if (!loginError) {
+      await migrateLocalStorage((await supabase.auth.getUser()).data.user!.id);
+      setName(authName);
+      setAuthLoading(false);
+      return;
+    }
+
+    // Login failed → try signup
+    const { error: signupError, data: signupData } = await supabase.auth.signUp({
+      email: dummyEmail,
+      password: authPassword,
+      options: { data: { display_name: authName } },
+    });
+
+    if (signupError) {
+      setAuthError(signupError.message);
+      setAuthLoading(false);
+      return;
+    }
+
+    // identities empty means user already exists (wrong password)
+    if (signupData.user && signupData.user.identities?.length === 0) {
+      setAuthError('パスワードが正しくありません');
+      setAuthLoading(false);
+      return;
+    }
+    setName(authName);
+    setAuthLoading(false);
   };
 
   const handleAnswer = (questionId: number, value: string) => {
@@ -175,88 +233,146 @@ export default function Home() {
             transition={{ delay: 0.2, duration: 0.4, ease: easeOut }}
             className="font-display text-display text-white mb-4"
           >
-            MBTI Shadow Friend
+            シャドウフレンドAI
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4, ease: easeOut }}
-            className="text-title-2 text-white/60 mb-2 text-center"
+            className="text-title-2 text-white/60 mb-12 text-center"
           >
-            あなたの性格タイプを診断しよう
+            親友AIと話そう
           </motion.p>
 
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.4, ease: easeOut }}
-            className="text-body text-white/40 mb-12 text-center max-w-md"
-          >
-            20の質問に答えるだけで、あなたのMBTIタイプが分かります
-          </motion.p>
-
-          {/* Auth status */}
-          {user ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-caption text-white/30 mb-4"
+          {!user ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.4, ease: easeOut }}
+              className="w-full max-w-sm space-y-4"
             >
-              {user.email} でログイン中{' '}
-              <button onClick={handleLogout} className="text-accent hover:underline">ログアウト</button>
-            </motion.p>
+              {authPhase === 'name' ? (
+                <>
+                  <input
+                    type="text"
+                    required
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    placeholder="お名前"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200 text-center"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && authName.trim()) {
+                        setAuthPhase('password');
+                        setAuthError('');
+                      }
+                    }}
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.01, opacity: 0.9 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => {
+                      if (authName.trim()) {
+                        setAuthPhase('password');
+                        setAuthError('');
+                      }
+                    }}
+                    disabled={!authName.trim()}
+                    className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    次へ
+                  </motion.button>
+                </>
+              ) : (
+                <>
+                  <p className="text-body text-white/50 text-center">
+                    {authName} さん、パスワードを入力してください
+                  </p>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="パスワード（6文字以上）"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200 text-center"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && authPassword.length >= 6 && !authLoading) {
+                        handleAuthSubmit();
+                      }
+                    }}
+                  />
+                  {authError && (
+                    <p className="text-red-400 text-sm text-center">{authError}</p>
+                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.01, opacity: 0.9 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={handleAuthSubmit}
+                    disabled={authPassword.length < 6 || authLoading}
+                    className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    {authLoading ? '処理中...' : '開始する'}
+                  </motion.button>
+                  <button
+                    onClick={() => {
+                      setAuthPhase('name');
+                      setAuthPassword('');
+                      setAuthError('');
+                    }}
+                    className="w-full text-white/40 hover:text-white/60 text-caption transition-colors text-center"
+                  >
+                    ← 戻る
+                  </button>
+                </>
+              )}
+            </motion.div>
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex gap-4 mb-6 text-caption"
+              className="w-full max-w-sm space-y-4"
             >
-              <a href="/auth/login" className="text-white/40 hover:text-accent">ログイン</a>
-              <a href="/auth/signup" className="text-white/40 hover:text-accent">新規登録</a>
+              <p className="text-caption text-white/30 text-center mb-2">
+                {user.user_metadata?.display_name || user.email?.replace(/@shadow\.local$/, '') || 'ユーザー'} でログイン中{' '}
+                <button onClick={handleLogout} className="text-accent hover:underline">ログアウト</button>
+              </p>
+
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="お名前"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200 text-center"
+              />
+
+              <motion.button
+                whileHover={{ scale: 1.01, opacity: 0.9 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={startDiagnosis}
+                disabled={!name.trim()}
+                className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                診断を始める
+              </motion.button>
+
+              {savedResult && (
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => {
+                    setName(savedResult.name);
+                    setMbtiResult(savedResult.type);
+                    setStep('result');
+                  }}
+                  className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-3 rounded-xl transition-all duration-200"
+                >
+                  前回の結果を見る（{savedResult.type}）
+                </motion.button>
+              )}
             </motion.div>
           )}
-
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.4, ease: easeOut }}
-            className="w-full max-w-sm space-y-4"
-          >
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="お名前"
-              className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-200 text-center"
-            />
-
-            <motion.button
-              whileHover={{ scale: 1.01, opacity: 0.9 }}
-              whileTap={{ scale: 0.99 }}
-              onClick={startDiagnosis}
-              disabled={!name.trim()}
-              className="w-full bg-accent text-black font-semibold text-body py-3 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              診断を始める
-            </motion.button>
-
-            {savedResult && (
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  setName(savedResult.name);
-                  setMbtiResult(savedResult.type);
-                  setStep('result');
-                }}
-                className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-3 rounded-xl transition-all duration-200"
-              >
-                前回の結果を見る（{savedResult.type}）
-              </motion.button>
-            )}
-          </motion.div>
         </motion.div>
       )}
 
@@ -451,31 +567,21 @@ export default function Home() {
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.01 }}
+                whileHover={{ scale: 1.01, opacity: 0.9 }}
                 whileTap={{ scale: 0.99 }}
-                onClick={async () => {
-                  const shareText = `私のMBTIタイプは${displayType}（${character.japaneseName}）でした！\n\n#MBTIShadowFriend #MBTI #${displayType}`;
-                  const shareUrl = window.location.href;
-
-                  if (navigator.share) {
-                    try {
-                      await navigator.share({ title: 'MBTI Shadow Friend - 診断結果', text: shareText, url: shareUrl });
-                    } catch {}
-                  } else {
-                    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-                    window.open(twitterUrl, '_blank', 'width=550,height=420');
-                  }
+                onClick={() => {
+                  const params = new URLSearchParams({ name: displayName, mbti: displayType });
+                  window.location.href = `/explore?${params.toString()}`;
                 }}
-                className="w-full bg-surface border border-white/10 text-white/80 font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+                className="w-full bg-white/10 border border-white/10 text-white font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 hover:bg-white/15"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="18" cy="5" r="3"></circle>
-                  <circle cx="6" cy="12" r="3"></circle>
-                  <circle cx="18" cy="19" r="3"></circle>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                  <line x1="9" y1="9" x2="9.01" y2="9" />
+                  <line x1="15" y1="9" x2="15.01" y2="9" />
                 </svg>
-                結果をシェア
+                キャラクターを探る
               </motion.button>
 
               <motion.button

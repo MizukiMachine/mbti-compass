@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
+const toDummyEmail = (name: string) => {
+  if (/^[a-zA-Z0-9._-]+$/.test(name)) return `${name}@shadowfriend.app`;
+  const hex = Array.from(new TextEncoder().encode(name))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${hex}@shadowfriend.app`;
+};
+
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,12 +24,13 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
+    const dummyEmail = toDummyEmail(username);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: dummyEmail, password });
 
     if (error) {
       setError(error.message === 'Invalid login credentials'
-        ? 'メールアドレスまたはパスワードが正しくありません'
+        ? 'ユーザー名またはパスワードが正しくありません'
         : error.message);
       setLoading(false);
       return;
@@ -35,15 +44,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <h1 className="font-display text-display text-white text-center mb-2">ログイン</h1>
-        <p className="text-body text-white/40 text-center mb-8">MBTI Shadow Friend</p>
+        <p className="text-body text-white/40 text-center mb-8">シャドウフレンドAI</p>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <input
-            type="email"
+            type="text"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="メールアドレス"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="ユーザー名"
             className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           <input
