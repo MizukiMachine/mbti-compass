@@ -24,7 +24,7 @@ interface SavedResult {
   answeredAt: string;
 }
 
-type Step = 'landing' | 'diagnosis' | 'result';
+type Step = 'landing' | 'diagnosis';
 type AuthPhase = 'name' | 'password';
 
 export default function Home() {
@@ -167,7 +167,9 @@ export default function Home() {
         });
       }
 
-      setStep('result');
+      // Redirect to explore page directly
+      const params = new URLSearchParams({ name, mbti: result });
+      window.location.href = `/explore?${params.toString()}`;
     }
   };
 
@@ -212,10 +214,6 @@ export default function Home() {
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
-
-  const displayType = mbtiResult || savedResult?.type || '';
-  const displayName = name || savedResult?.name || '';
-  const character = displayType ? getCharacter(displayType) : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -362,9 +360,8 @@ export default function Home() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   onClick={() => {
-                    setName(savedResult.name);
-                    setMbtiResult(savedResult.type);
-                    setStep('result');
+                    const params = new URLSearchParams({ name: savedResult.name, mbti: savedResult.type });
+                    window.location.href = `/explore?${params.toString()}`;
                   }}
                   className="w-full bg-surface border border-accent/20 text-accent font-semibold text-body py-3 rounded-xl transition-all duration-200"
                 >
@@ -447,155 +444,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Result */}
-      {step === 'result' && character && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, ease: easeOut }}
-          className="min-h-screen px-6 py-24"
-        >
-          <div className="max-w-2xl mx-auto">
-            {/* Hero */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.6, ease: easeOut }}
-              className="text-center mb-16"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.4, ease: easeOut }}
-                className="text-caption text-white/40 mb-4 uppercase tracking-wider"
-              >
-                {displayName}
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4, duration: 0.5, ease: easeOut }}
-                className="text-6xl mb-6"
-              >
-                {character.emoji}
-              </motion.div>
-
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.4, ease: easeOut }}
-                className="font-display text-[72px] leading-tight text-white mb-4"
-              >
-                {displayType}
-              </motion.h1>
-
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.4, ease: easeOut }}
-                className="text-title-2 text-accent mb-4"
-              >
-                {character.name} — {character.japaneseName}
-              </motion.p>
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.7, duration: 0.4 }}
-                className="text-body text-white/60"
-              >
-                {character.traits.join('・')}
-              </motion.p>
-            </motion.div>
-
-            {/* Shadow Function */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9, duration: 0.6, ease: easeOut }}
-              className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
-            >
-              <h2 className="text-title-1 text-white mb-4">
-                影の機能：{character.shadowFunction.name}
-              </h2>
-              <p className="text-body text-white/70 leading-relaxed mb-4">
-                {character.shadowFunction.description}
-              </p>
-              <p className="text-body text-accent/80">
-                成長のヒント：{character.shadowFunction.growthPerspective}
-              </p>
-            </motion.div>
-
-            {/* Reflection Prompts */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.1, duration: 0.6, ease: easeOut }}
-              className="bg-surface border border-white/5 rounded-2xl p-12 mb-12"
-            >
-              <h2 className="text-title-1 text-white mb-6">振り返りのヒント</h2>
-              <div className="space-y-4">
-                {character.reflectionPrompts.map((prompt, i) => (
-                  <div key={i} className="bg-surface-elevated rounded-xl p-4">
-                    <p className="text-body text-white/70">{prompt}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Actions */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.3, duration: 0.4 }}
-              className="flex flex-col gap-4"
-            >
-              <motion.button
-                whileHover={{ scale: 1.01, opacity: 0.9 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  const params = new URLSearchParams({ name: displayName, mbti: displayType });
-                  window.location.href = `/chat?${params.toString()}`;
-                }}
-                className="w-full bg-accent text-black font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                AIと話す
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.01, opacity: 0.9 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  const params = new URLSearchParams({ name: displayName, mbti: displayType });
-                  window.location.href = `/explore?${params.toString()}`;
-                }}
-                className="w-full bg-white/10 border border-white/10 text-white font-semibold text-body py-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 hover:bg-white/15"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                  <line x1="9" y1="9" x2="9.01" y2="9" />
-                  <line x1="15" y1="9" x2="15.01" y2="9" />
-                </svg>
-                キャラクターを探る
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={resetAll}
-                className="w-full text-white/40 hover:text-white/60 text-body py-2 transition-colors"
-              >
-                もう一度診断する
-              </motion.button>
-            </motion.div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }
