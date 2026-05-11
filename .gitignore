@@ -8,7 +8,6 @@ out/
 .env*.local
 
 # Build
-package-lock.json
 tsconfig.tsbuildinfo
 
 # Vercel

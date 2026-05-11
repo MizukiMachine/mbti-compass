@@ -5,18 +5,11 @@ import { motion } from 'framer-motion';
 import { getCharacter } from '../src/data/mbti-characters';
 import { shuffleQuestions, calculateMbti, MbtiQuestion } from '../src/data/mbti-questions';
 import { createClient } from '../src/lib/supabase/client';
+import { toDummyEmail } from '../src/lib/auth';
 import type { User } from '@supabase/supabase-js';
 
 const easeOut = [0.16, 1, 0.3, 1];
 const STORAGE_KEY = 'mbti-shadow-friend-result';
-
-const toDummyEmail = (name: string) => {
-  if (/^[a-zA-Z0-9._-]+$/.test(name)) return `${name}@shadowfriend.app`;
-  const hex = Array.from(new TextEncoder().encode(name))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  return `${hex}@shadowfriend.app`;
-};
 
 interface SavedResult {
   type: string;

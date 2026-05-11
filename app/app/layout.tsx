@@ -5,19 +5,19 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'シャドウフレンドAI - あなたの影と対話するAI',
-  description: '20の質問でMBTIタイプを診断。あなたと同じ性格のAIが、自分では気づかない偏り（シャドウ機能）を代弁してくれます。',
-  keywords: 'MBTI, 性格診断, シャドウ機能, AIチャット, シャドウフレンドAI',
+  title: 'シャドウフレンドAI - MBTI診断で見つけるもう一人の自分',
+  description: '20の質問でMBTIタイプを診断。あなたの認知機能とシャドウ機能を可視化し、自分では気づかない偏りを見つけます。',
+  keywords: 'MBTI, 性格診断, シャドウ機能, 認知機能, シャドウフレンドAI',
   openGraph: {
-    title: 'シャドウフレンドAI - あなたの影と対話するAI',
-    description: 'あなたと同じ性格のAIが、自分の見えない部分（シャドウ）を代弁。',
+    title: 'シャドウフレンドAI - MBTI診断で見つけるもう一人の自分',
+    description: '20の質問でMBTIタイプを診断。認知機能とシャドウ機能を可視化します。',
     type: 'website',
     locale: 'ja_JP',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'シャドウフレンドAI - あなたの影と対話するAI',
-    description: 'あなたと同じ性格のAIが、自分の見えない部分（シャドウ）を代弁。',
+    title: 'シャドウフレンドAI - MBTI診断で見つけるもう一人の自分',
+    description: '20の質問でMBTIタイプを診断。認知機能とシャドウ機能を可視化します。',
   },
 };
 

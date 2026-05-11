@@ -2,15 +2,8 @@
 
 import { useState } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
+import { toDummyEmail } from '@/src/lib/auth';
 import { useRouter } from 'next/navigation';
-
-const toDummyEmail = (name: string) => {
-  if (/^[a-zA-Z0-9._-]+$/.test(name)) return `${name}@shadowfriend.app`;
-  const hex = Array.from(new TextEncoder().encode(name))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  return `${hex}@shadowfriend.app`;
-};
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
