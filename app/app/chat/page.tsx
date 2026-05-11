@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
-import { createConversationEngine, ConversationContext, StreamCallbacks } from '../../src/services/conversation-engine';
-import { Message } from '../../src/types/websocket';
+import { createConversationEngine, ConversationContext, StreamCallbacks, Message } from '../../src/services/conversation-engine';
 import { getCharacter } from '../../src/data/mbti-characters';
 import VoiceInputButton from '../../src/components/VoiceInputButton';
 import { createClient } from '../../src/lib/supabase/client';

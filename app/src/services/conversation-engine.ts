@@ -3,7 +3,32 @@
  * Client-side engine that communicates with server-side AI via /api/chat (SSE streaming)
  */
 
-import { Message, MessageChunk, EmotionalState, StreamConfig } from '../types/websocket';
+export interface EmotionalState {
+  primary: 'happy' | 'sad' | 'excited' | 'anxious' | 'calm' | 'loving' | 'playful';
+  intensity: number;
+  timestamp: string;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface MessageChunk {
+  type: 'text' | 'emotion' | 'action' | 'thinking';
+  content: string;
+  timestamp: string;
+}
+
+export interface StreamConfig {
+  enableTypingIndicators: boolean;
+  enableEmotionUpdates: boolean;
+  chunkDelay?: number;
+  maxChunkSize?: number;
+}
 
 export interface ConversationContext {
   conversationId: string;
