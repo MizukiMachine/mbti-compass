@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import { motion } from 'framer-motion';
 import FloatingCard from './FloatingCard';
-import { TraitCardData } from '../../src/data/trait-cards';
+import { DynamicCard } from '../../src/types/explore';
 import { getCharacter } from '../../src/data/mbti-characters';
 
 function hashStr(s: string): number {
@@ -24,16 +25,41 @@ function seededRandom(seed: number): () => number {
 interface TraitScatterViewProps {
   mbtiType: string;
   userName: string;
-  cards: TraitCardData[];
-  onSelect: (card: TraitCardData) => void;
+  cards: DynamicCard[];
+  onSelect: (card: DynamicCard) => void;
   isMobile: boolean;
+  phase: number;
+  isLoadingNext: boolean;
+  onExploreDeeper: () => void;
+  selectionCount: number;
+  error: string | null;
 }
 
-export default function TraitScatterView({ mbtiType, userName, cards, onSelect, isMobile }: TraitScatterViewProps) {
+function SkeletonCard({ index }: { index: number }) {
+  return (
+    <div
+      className="absolute rounded-xl backdrop-blur-sm"
+      style={{
+        width: 110,
+        height: 75,
+        left: `${15 + (index % 4) * 20}%`,
+        top: `${20 + Math.floor(index / 4) * 22}%`,
+        background: 'linear-gradient(135deg, rgba(192, 132, 252, 0.06) 0%, rgba(192, 132, 252, 0.02) 100%)',
+        border: '1px solid rgba(192, 132, 252, 0.1)',
+        animation: `shimmer 1.5s ease-in-out ${index * 0.15}s infinite alternate, float ${3 + index * 0.3}s ease-in-out infinite`,
+      }}
+    />
+  );
+}
+
+export default function TraitScatterView({
+  mbtiType, userName, cards, onSelect, isMobile,
+  phase, isLoadingNext, onExploreDeeper, selectionCount, error,
+}: TraitScatterViewProps) {
   const character = getCharacter(mbtiType);
 
   const positions = useMemo(() => {
-    const rand = seededRandom(hashStr(mbtiType));
+    const rand = seededRandom(hashStr(mbtiType + phase));
 
     if (isMobile) {
       return cards.map((card, i) => ({
@@ -65,9 +91,8 @@ export default function TraitScatterView({ mbtiType, userName, cards, onSelect, 
         } as React.CSSProperties,
       };
     });
-  }, [mbtiType, cards, isMobile]);
+  }, [mbtiType, cards, isMobile, phase]);
 
-  // Particles
   const particles = useMemo(() => {
     const rand = seededRandom(hashStr(mbtiType + 'particles'));
     return Array.from({ length: 12 }, (_, i) => ({
@@ -80,10 +105,28 @@ export default function TraitScatterView({ mbtiType, userName, cards, onSelect, 
     }));
   }, [mbtiType]);
 
+  const showExploreButton = phase === 1 && selectionCount >= 2;
+
+  const errorToast = error && (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl backdrop-blur-sm"
+      style={{
+        background: 'rgba(239, 68, 68, 0.15)',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
+      }}
+    >
+      <p className="text-[11px] text-red-300">{error}</p>
+      <button
+        onClick={onExploreDeeper}
+        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-red-500/20 text-red-200 hover:bg-red-500/30 transition-colors"
+      >
+        再試行
+      </button>
+    </div>
+  );
+
   if (isMobile) {
     return (
       <div className="min-h-screen bg-background flex flex-col overflow-y-auto">
-        {/* Header */}
         <div className="pt-8 pb-4 px-5 text-center">
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-accent/20 text-accent tracking-wider">
             {mbtiType}
@@ -94,42 +137,70 @@ export default function TraitScatterView({ mbtiType, userName, cards, onSelect, 
           {userName && <p className="text-caption text-white/40 mt-1">{userName}の特性マップ</p>}
         </div>
 
-        {/* Mobile grid */}
         <div className="px-4 pb-8 grid grid-cols-2 gap-3">
-          {cards.map((card, i) => (
-            <button
-              key={card.id}
-              onClick={() => onSelect(card)}
-              className="rounded-xl p-3 flex flex-col justify-between text-left backdrop-blur-sm active:scale-95 transition-transform"
-              style={{
-                background: `linear-gradient(135deg, ${card.color}18 0%, ${card.color}08 100%)`,
-                border: `1px solid ${card.color}25`,
-                minHeight: 100,
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-xl leading-none">{card.emoji}</span>
-                <span
-                  className="text-[7px] font-bold px-1.5 py-[2px] rounded-full uppercase tracking-wider"
-                  style={{ backgroundColor: `${card.color}20`, color: card.color }}
+          {isLoadingNext
+            ? Array.from({ length: 6 }, (_, i) => (
+                <div key={`skel-${i}`} className="rounded-xl p-3" style={{
+                  background: 'linear-gradient(135deg, rgba(192, 132, 252, 0.06) 0%, rgba(192, 132, 252, 0.02) 100%)',
+                  border: '1px solid rgba(192, 132, 252, 0.1)',
+                  minHeight: 100,
+                  animation: 'shimmer 1.5s ease-in-out infinite alternate',
+                }} />
+              ))
+            : cards.map((card, i) => (
+                <button
+                  key={card.id}
+                  onClick={() => onSelect(card)}
+                  className="rounded-xl p-3 flex flex-col justify-between text-left backdrop-blur-sm active:scale-95 transition-transform"
+                  style={{
+                    background: `linear-gradient(135deg, ${card.color}18 0%, ${card.color}08 100%)`,
+                    border: `1px solid ${card.color}25`,
+                    minHeight: 100,
+                  }}
                 >
-                  {card.category}
-                </span>
-              </div>
-              <div className="mt-2">
-                <p className="text-[12px] font-semibold text-white/90 leading-tight">{card.label}</p>
-                <p className="text-[9px] text-white/40 leading-tight mt-0.5">{card.shortDescription}</p>
-              </div>
-            </button>
-          ))}
+                  <div className="flex items-start justify-between">
+                    <span className="text-xl leading-none">{card.emoji}</span>
+                    <span
+                      className="text-[7px] font-bold px-1.5 py-[2px] rounded-full uppercase tracking-wider"
+                      style={{ backgroundColor: `${card.color}20`, color: card.color }}
+                    >
+                      {card.category}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-[12px] font-semibold text-white/90 leading-tight">{card.label}</p>
+                    <p className="text-[9px] text-white/40 leading-tight mt-0.5">{card.shortDescription}</p>
+                  </div>
+                </button>
+              ))
+          }
         </div>
+
+        {(showExploreButton || phase >= 2) && !isLoadingNext && (
+          <div className="px-4 pb-6">
+            <button
+              onClick={onExploreDeeper}
+              className="w-full py-3 rounded-xl text-[12px] font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors"
+            >
+              もっと深く探る
+            </button>
+          </div>
+        )}
+
+        {errorToast}
+
+        <style jsx>{`
+          @keyframes shimmer {
+            0% { opacity: 0.4; }
+            100% { opacity: 0.8; }
+          }
+        `}</style>
       </div>
     );
   }
 
   return (
     <div className="h-screen bg-background relative overflow-hidden">
-      {/* Particles */}
       {particles.map((p) => (
         <div
           key={p.id}
@@ -145,7 +216,6 @@ export default function TraitScatterView({ mbtiType, userName, cards, onSelect, 
         />
       ))}
 
-      {/* Header */}
       <div className="absolute top-6 left-0 right-0 text-center z-10 pointer-events-none">
         <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-accent/20 text-accent tracking-wider">
           {mbtiType}
@@ -156,21 +226,44 @@ export default function TraitScatterView({ mbtiType, userName, cards, onSelect, 
         {userName && <p className="text-caption text-white/40 mt-1">{userName}の特性をタップして探索</p>}
       </div>
 
-      {/* Floating cards */}
-      {positions.map(({ card, index, style }) => (
-        <FloatingCard
-          key={card.id}
-          card={card}
-          style={style}
-          index={index}
-          onClick={() => onSelect(card)}
-        />
-      ))}
+      {isLoadingNext
+        ? Array.from({ length: 6 }, (_, i) => <SkeletonCard key={`skel-${i}`} index={i} />)
+        : positions.map(({ card, index, style }) => (
+            <FloatingCard
+              key={card.id}
+              card={card}
+              style={style}
+              index={index}
+              onClick={() => onSelect(card)}
+            />
+          ))
+      }
+
+      {(showExploreButton || phase >= 2) && !isLoadingNext && (
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={onExploreDeeper}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 px-6 py-2.5 rounded-full text-[12px] font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors z-20"
+        >
+          もっと深く探る
+        </motion.button>
+      )}
+
+      {errorToast}
 
       <style jsx>{`
         @keyframes twinkle {
           0% { opacity: 0.15; }
           100% { opacity: 0.6; }
+        }
+        @keyframes shimmer {
+          0% { opacity: 0.4; }
+          100% { opacity: 0.8; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
         }
       `}</style>
     </div>

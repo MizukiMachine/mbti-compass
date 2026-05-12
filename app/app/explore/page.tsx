@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { TraitCardData, getTraitCardsForType } from '../../src/data/trait-cards';
+import { DynamicCard } from '../../src/types/explore';
+import { useExploreState } from '../../src/lib/use-explore-state';
 import TraitScatterView from './TraitScatterView';
 import DrillDownView from './DrillDownView';
 
@@ -29,8 +30,13 @@ function ExploreContent() {
   const router = useRouter();
   const mbtiType = searchParams.get('mbti') || '';
   const userName = searchParams.get('name') || '';
-  const [selectedTrait, setSelectedTrait] = useState<TraitCardData | null>(null);
+  const [selectedTrait, setSelectedTrait] = useState<DynamicCard | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  const {
+    phase, selectionHistory, isLoadingNext, error,
+    cards, selectCard, fetchNextPhase,
+  } = useExploreState(mbtiType);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -64,7 +70,10 @@ function ExploreContent() {
     );
   }
 
-  const cards = getTraitCardsForType(mbtiType);
+  const handleSelect = (card: DynamicCard) => {
+    selectCard(card);
+    setSelectedTrait(card);
+  };
 
   return (
     <AnimatePresence mode="wait">
@@ -80,8 +89,13 @@ function ExploreContent() {
             mbtiType={mbtiType}
             userName={userName}
             cards={cards}
-            onSelect={setSelectedTrait}
+            onSelect={handleSelect}
             isMobile={isMobile}
+            phase={phase}
+            isLoadingNext={isLoadingNext}
+            onExploreDeeper={fetchNextPhase}
+            selectionCount={selectionHistory.length}
+            error={error}
           />
         </motion.div>
       ) : (
@@ -97,6 +111,9 @@ function ExploreContent() {
             mbtiType={mbtiType}
             userName={userName}
             onBack={() => setSelectedTrait(null)}
+            phase={phase}
+            onNextExploration={fetchNextPhase}
+            isLoadingNext={isLoadingNext}
           />
         </motion.div>
       )}

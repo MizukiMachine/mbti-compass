@@ -2,43 +2,50 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TraitCardData } from '../../src/data/trait-cards';
+import { DynamicCard } from '../../src/types/explore';
 import { getFunctionCharacters } from '../../src/data/function-characters';
 import { getCharacter } from '../../src/data/mbti-characters';
 
 interface DrillDownViewProps {
-  card: TraitCardData;
+  card: DynamicCard;
   mbtiType: string;
   userName: string;
   onBack: () => void;
+  phase: number;
+  onNextExploration: () => void;
+  isLoadingNext: boolean;
 }
 
-export default function DrillDownView({ card, mbtiType, userName, onBack }: DrillDownViewProps) {
+export default function DrillDownView({
+  card, mbtiType, userName, onBack, phase, onNextExploration, isLoadingNext,
+}: DrillDownViewProps) {
   const character = getCharacter(mbtiType);
-  const functionChars = getFunctionCharacters(mbtiType);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  // Find related function characters
-  const relatedFuncChars = functionChars.filter((fc) =>
-    card.relatedFunctions.includes(fc.functionCode)
-  );
-
-  // Collect topics from related functions
-  const relatedTopics = relatedFuncChars.flatMap((fc) =>
-    fc.topics.map((t) => ({
-      ...t,
-      funcName: fc.name,
-      funcEmoji: fc.emoji,
-      funcColor: fc.color,
-    }))
-  );
 
   const shadowGrowth = character.shadowFunction.growthPerspective;
   const reflectionPrompts = character.reflectionPrompts.slice(0, 2);
 
+  const isStatic = card.sourceType === 'static';
+
+  let relatedTopics: { id: string; emoji: string; title: string; summary: string; items: { title: string; content: string }[]; funcName: string; funcEmoji: string; funcColor: string }[] = [];
+
+  if (isStatic) {
+    const functionChars = getFunctionCharacters(mbtiType);
+    const relatedFuncChars = functionChars.filter((fc) =>
+      card.relatedFunctions.includes(fc.functionCode)
+    );
+    relatedTopics = relatedFuncChars.flatMap((fc) =>
+      fc.topics.map((t) => ({
+        ...t,
+        funcName: fc.name,
+        funcEmoji: fc.emoji,
+        funcColor: fc.color,
+      }))
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-6 pb-3">
         <button
           onClick={onBack}
@@ -54,7 +61,6 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
         </span>
       </div>
 
-      {/* Hero card */}
       <div className="px-5 pb-4">
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -82,6 +88,11 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
                 >
                   {card.category}
                 </span>
+                {card.sourceType === 'llm' && (
+                  <span className="text-[8px] font-bold px-2 py-[2px] rounded-full bg-accent/20 text-accent">
+                    AI生成
+                  </span>
+                )}
               </div>
               <p className="text-caption text-white/50 mt-1">{card.shortDescription}</p>
             </div>
@@ -90,10 +101,8 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
         </motion.div>
       </div>
 
-      {/* Sub cards */}
       <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3">
-        {/* Related function topics */}
-        {relatedTopics.length > 0 && (
+        {isStatic && relatedTopics.length > 0 && (
           <div>
             <h3 className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase mb-2">
               関連する認知機能
@@ -109,7 +118,7 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
                   color={topic.funcColor}
                   expanded={expandedId === topic.id}
                   onToggle={() => setExpandedId(expandedId === topic.id ? null : topic.id)}
-                  items={topic.items.map((it) => ({ title: it.title, content: it.content }))}
+                  items={topic.items}
                   badge={`${topic.funcName}より`}
                   badgeEmoji={topic.funcEmoji}
                 />
@@ -118,7 +127,28 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
           </div>
         )}
 
-        {/* Shadow growth perspective */}
+        {!isStatic && card.relatedFunctions.length > 0 && (
+          <div>
+            <h3 className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase mb-2">
+              関連認知機能
+            </h3>
+            <div className="flex gap-2">
+              {card.relatedFunctions.map((fn) => (
+                <span
+                  key={fn}
+                  className="text-[10px] px-2.5 py-1 rounded-full font-semibold"
+                  style={{
+                    backgroundColor: `${card.color}15`,
+                    color: card.color,
+                  }}
+                >
+                  {fn}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <h3 className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase mb-2">
             シャドウの成長視角
@@ -134,7 +164,6 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
           </div>
         </div>
 
-        {/* Reflection prompts */}
         <div>
           <h3 className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase mb-2">
             振り返りの質問
@@ -154,6 +183,18 @@ export default function DrillDownView({ card, mbtiType, userName, onBack }: Dril
             ))}
           </div>
         </div>
+
+        {phase >= 2 && (
+          <div className="pt-2 pb-4">
+            <button
+              onClick={onNextExploration}
+              disabled={isLoadingNext}
+              className="w-full py-3 rounded-xl text-[12px] font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors disabled:opacity-50"
+            >
+              {isLoadingNext ? '生成中...' : '次の探索へ'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

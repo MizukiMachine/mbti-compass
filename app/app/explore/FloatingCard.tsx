@@ -1,26 +1,28 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { TraitCardData } from '../../src/data/trait-cards';
+import { DynamicCard } from '../../src/types/explore';
 
-type CardSize = 'strength' | 'tendency' | 'shadow' | 'growth';
+type CardSize = 'strength' | 'tendency' | 'shadow' | 'growth' | 'insight' | 'trend';
 
 const sizeMap: Record<CardSize, { w: number; h: number }> = {
   strength: { w: 140, h: 100 },
   tendency: { w: 120, h: 85 },
   shadow: { w: 100, h: 70 },
   growth: { w: 100, h: 70 },
+  insight: { w: 120, h: 85 },
+  trend: { w: 130, h: 90 },
 };
 
 interface FloatingCardProps {
-  card: TraitCardData;
+  card: DynamicCard;
   style: React.CSSProperties;
   index: number;
   onClick: () => void;
 }
 
 export default function FloatingCard({ card, style, index, onClick }: FloatingCardProps) {
-  const size = sizeMap[card.category];
+  const size = sizeMap[card.category] || sizeMap.insight;
   const duration = 3 + (index % 5) * 0.4;
 
   return (
@@ -55,10 +57,12 @@ export default function FloatingCard({ card, style, index, onClick }: FloatingCa
       onClick={onClick}
     >
       <div
-        className="w-full h-full rounded-xl p-2.5 flex flex-col justify-between backdrop-blur-sm"
+        className="w-full h-full rounded-xl p-2.5 flex flex-col justify-between backdrop-blur-sm relative"
         style={{
-          background: `linear-gradient(135deg, ${card.color}18 0%, ${card.color}08 100%)`,
-          border: `1px solid ${card.color}25`,
+          background: card.sourceType === 'llm'
+            ? `linear-gradient(135deg, ${card.color}22 0%, ${card.color}0A 50%, ${card.color}15 100%)`
+            : `linear-gradient(135deg, ${card.color}18 0%, ${card.color}08 100%)`,
+          border: `1px solid ${card.sourceType === 'llm' ? `${card.color}40` : `${card.color}25`}`,
         }}
       >
         <div className="flex items-start justify-between">
