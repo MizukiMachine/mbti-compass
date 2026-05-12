@@ -14,7 +14,13 @@ const mbtiKeywords = [
 
 const RSS_SOURCES = [
   { url: 'https://www.psychologytoday.com/intl/feed', name: 'Psychology Today' },
+  { url: 'https://www.verywellmind.com/rss', name: 'Verywell Mind' },
+  { url: 'https://www.mindful.org/feed/', name: 'Mindful' },
+  { url: 'https://greatergood.berkeley.edu/article_feeds.rss', name: 'Greater Good Mag' },
+  { url: 'https://www.lifehacker.jp/feed/index.xml', name: 'ライフハッカー' },
+  { url: 'https://gigazine.net/index.php?rss_news', name: 'GIGAZINE' },
   'https://b.hatena.ne.jp/hotentry/life.rss',
+  'https://b.hatena.ne.jp/hotentry/learning.rss',
 ];
 
 const CACHE_TTL = 5 * 60 * 1000;
@@ -37,7 +43,7 @@ async function fetchFeed(source: string | { url: string; name: string }): Promis
     const name = typeof source === 'string' ? new URL(url).hostname : source.name;
     return (feed.items || [])
       .filter(item => matchesMbtiKeyword(`${item.title || ''} ${item.contentSnippet || ''}`))
-      .slice(0, 5)
+      .slice(0, 3)
       .map(item => ({
         title: item.title || '',
         link: item.link || '',
