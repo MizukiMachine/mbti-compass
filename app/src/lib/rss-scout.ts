@@ -6,10 +6,11 @@ export interface TrendContext {
 }
 
 const mbtiKeywords = [
-  'stress', 'communication', 'personality', 'growth', 'psychology',
+  'mbti', '16personalities', 'stress', 'communication', 'personality', 'growth', 'psychology',
   'empathy', 'introvert', 'extrovert', 'cognitive', 'mindfulness',
   'mental health', 'self-awareness', 'motivation', 'resilience',
-  'ストレス', 'コミュニケーション', '性格', '心理', '自己理解', '成長',
+  'well-being', 'self-care', 'introversion', 'extraversion',
+  'ストレス', 'コミュニケーション', '性格', '心理', '自己理解', '成長', '性格診断', 'セルフケア',
 ];
 
 const RSS_SOURCES = [
@@ -19,8 +20,8 @@ const RSS_SOURCES = [
   { url: 'https://greatergood.berkeley.edu/article_feeds.rss', name: 'Greater Good Mag' },
   { url: 'https://www.lifehacker.jp/feed/index.xml', name: 'ライフハッカー' },
   { url: 'https://gigazine.net/index.php?rss_news', name: 'GIGAZINE' },
-  'https://b.hatena.ne.jp/hotentry/life.rss',
-  'https://b.hatena.ne.jp/hotentry/learning.rss',
+  { url: 'https://b.hatena.ne.jp/hotentry/life.rss', name: 'はてなブックマーク(ライフ)' },
+  { url: 'https://b.hatena.ne.jp/hotentry/learning.rss', name: 'はてなブックマーク(学び)' },
 ];
 
 const CACHE_TTL = 5 * 60 * 1000;
@@ -60,7 +61,16 @@ export async function getTrendContext(): Promise<TrendContext> {
     return cachedResult;
   }
 
-  const allArticles = (await Promise.all(RSS_SOURCES.map(fetchFeed))).flat();
+  const feedResults = await Promise.all(RSS_SOURCES.map(fetchFeed));
+
+  // Rotate across sources for diversity: 1st from source 0, 1st from source 1, ...
+  const allArticles: { title: string; link: string; source: string }[] = [];
+  const maxPerSource = Math.max(...feedResults.map(r => r.length));
+  for (let i = 0; i < maxPerSource; i++) {
+    for (const result of feedResults) {
+      if (result[i]) allArticles.push(result[i]);
+    }
+  }
 
   const keywordCount: Record<string, number> = {};
   for (const article of allArticles) {
