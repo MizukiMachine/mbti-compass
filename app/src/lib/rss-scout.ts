@@ -24,19 +24,19 @@ let cachedAt = 0;
 
 const parser = new Parser({ timeout: 8000 });
 
-function matchesMbitKeyword(text: string): boolean {
+function matchesMbtiKeyword(text: string): boolean {
   const lower = text.toLowerCase();
   return mbtiKeywords.some(kw => lower.includes(kw));
 }
 
 async function fetchFeed(source: string | { url: string; name: string }): Promise<{ title: string; link: string; source: string }[]> {
   const url = typeof source === 'string' ? source : source.url;
-  const name = typeof source === 'string' ? new URL(url).hostname : source.name;
 
   try {
     const feed = await parser.parseURL(url);
+    const name = typeof source === 'string' ? new URL(url).hostname : source.name;
     return (feed.items || [])
-      .filter(item => matchesMbitKeyword(`${item.title || ''} ${item.contentSnippet || ''}`))
+      .filter(item => matchesMbtiKeyword(`${item.title || ''} ${item.contentSnippet || ''}`))
       .slice(0, 5)
       .map(item => ({
         title: item.title || '',

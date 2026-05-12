@@ -21,7 +21,7 @@ Ti=#3B82F6, Te=#0EA5E9, Fi=#EC4899, Fe=#F472B6
 
 ## 出力ルール
 1. 5〜7枚のカードをJSON配列で出力せよ
-2. categoryは以下から3種類以上含め: "strength", "tendency", "shadow", "growth", "insight"
+2. categoryは以下から3種類以上含め: "strength", "tendency", "shadow", "growth", "insight", "trend"
 3. relatedFunctionsは必ず上記8コード（Ni, Ne, Si, Se, Ti, Te, Fi, Fe）から選べ
 4. colorはrelatedFunctions[0]に対応する上記の色を使用せよ
 5. labelは日本語の2〜4文字の形容詞・名詞にせよ
@@ -68,7 +68,8 @@ Phase ${request.phase}では${request.phase <= 2 ? 'シャドウ機能や未開�
 ## 最新トレンド記事
 ${articleList}
 
-※ 上記のトレンド記事の内容を参考に、1〜2枚のカードを"trend"カテゴリで生成せよ。trendReferenceには記事タイトルとsourceを含めること。`;
+※ 上記のトレンド記事の内容を参考に、1〜2枚のカードを"trend"カテゴリで生成せよ。
+trendカードには以下のフィールドを追加せよ: "trendReference":{"articleTitle":"記事タイトル","source":"ソース名"}`;
   }
 
   return { systemPrompt, userPrompt };
