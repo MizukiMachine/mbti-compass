@@ -1,4 +1,5 @@
 import { GenerateRequest } from '../../types/explore';
+import { TrendContext } from '../rss-scout';
 import { mbtiCharacters } from '../../data/mbti-characters';
 
 const functionColors: Record<string, string> = {
@@ -6,7 +7,7 @@ const functionColors: Record<string, string> = {
   Ti: '#3B82F6', Te: '#0EA5E9', Fi: '#EC4899', Fe: '#F472B6',
 };
 
-export function buildExplorePrompt(request: GenerateRequest): { systemPrompt: string; userPrompt: string } {
+export function buildExplorePrompt(request: GenerateRequest, trendContext?: TrendContext): { systemPrompt: string; userPrompt: string } {
   const char = mbtiCharacters[request.mbtiType];
   if (!char) {
     throw new Error(`Unknown MBTI type: ${request.mbtiType}`);
@@ -43,7 +44,7 @@ Ti=#3B82F6, Te=#0EA5E9, Fi=#EC4899, Fe=#F472B6
         .join('\n')
     : 'まだ選択履歴がありません';
 
-  const userPrompt = `## ユーザーのMBTIタイプ
+  let userPrompt = `## ユーザーのMBTIタイプ
 タイプ: ${request.mbtiType}（${char.japaneseName}）
 特性: ${char.traits.join('、')}
 シャドウ機能: ${char.shadowFunction.name} - ${char.shadowFunction.description}
@@ -59,6 +60,16 @@ ${historySummary}
 ## 指示
 上記のMBTIタイプと選択履歴を踏まえ、ユーザーに新しい気づきを与える5〜7枚の特性カードを生成せよ。
 Phase ${request.phase}では${request.phase <= 2 ? 'シャドウ機能や未開拓の認知機能に関連する視点を積極的に含めること' : 'これまでの選択の傾向を分析し、より深い自己理解につながる視点を提供すること'}。`;
+
+  if (trendContext && trendContext.articles.length > 0) {
+    const articleList = trendContext.articles.slice(0, 3).map(a => `- 「${a.title}」(${a.source})`).join('\n');
+    userPrompt += `
+
+## 最新トレンド記事
+${articleList}
+
+※ 上記のトレンド記事の内容を参考に、1〜2枚のカードを"trend"カテゴリで生成せよ。trendReferenceには記事タイトルとsourceを含めること。`;
+  }
 
   return { systemPrompt, userPrompt };
 }

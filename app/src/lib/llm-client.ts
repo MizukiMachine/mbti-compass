@@ -1,7 +1,8 @@
 import { DynamicCard, GenerateRequest } from '../types/explore';
+import { TrendContext } from './rss-scout';
 import { buildExplorePrompt } from './prompts/explore-cards';
 
-export async function generateExplorationCards(request: GenerateRequest): Promise<DynamicCard[]> {
+export async function generateExplorationCards(request: GenerateRequest, trendContext?: TrendContext | null): Promise<DynamicCard[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const baseUrl = process.env.LLM_BASE_URL || 'https://api.z.ai/api/anthropic';
   const model = process.env.LLM_MODEL || 'glm-5-turbo';
@@ -10,7 +11,7 @@ export async function generateExplorationCards(request: GenerateRequest): Promis
     throw new Error('ANTHROPIC_API_KEY is not configured');
   }
 
-  const { systemPrompt, userPrompt } = buildExplorePrompt(request);
+  const { systemPrompt, userPrompt } = buildExplorePrompt(request, trendContext ?? undefined);
 
   const requestBody = {
     model,

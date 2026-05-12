@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateExplorationCards } from '../../../../src/lib/llm-client';
+import { getTrendContext } from '../../../../src/lib/rss-scout';
 import { GenerateRequest } from '../../../../src/types/explore';
 
 export async function POST(request: NextRequest) {
@@ -20,11 +21,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const trendContext = await getTrendContext().catch(() => null);
+
     const cards = await generateExplorationCards({
       mbtiType: body.mbtiType,
       phase: body.phase,
       selectionHistory: body.selectionHistory,
-    });
+    }, trendContext);
 
     return NextResponse.json({ cards });
   } catch (error) {
