@@ -30,6 +30,20 @@ const confidenceLabels = {
   high: '高',
 };
 
+const presetGroups = workplacePresets.reduce<Array<{ label: string; presets: typeof workplacePresets }>>(
+  (groups, preset) => {
+    const group = groups.find(item => item.label === preset.categoryLabel);
+    if (group) {
+      group.presets.push(preset);
+      return groups;
+    }
+
+    groups.push({ label: preset.categoryLabel, presets: [preset] });
+    return groups;
+  },
+  [],
+);
+
 function SectionList({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="rounded-[16px] border border-[#EEE7DE] bg-white/86 p-4">
@@ -97,7 +111,7 @@ function PanelContent({
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
         <h2 className="text-[24px] font-extrabold text-[#221B31]">人物を選択</h2>
         <p className="mt-3 text-sm font-bold leading-relaxed text-[#746B82]">
-          周囲の人物スロットを選ぶと、相談アクションと関係メモが表示されます。
+          気になる人物プリセットを選ぶと、摩擦の傾向と接し方が表示されます。
         </p>
       </div>
     );
@@ -110,30 +124,34 @@ function PanelContent({
       <div className="border-b border-[#EFE7DE] px-5 pb-5 pt-5 lg:px-6 lg:pt-7">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-extrabold text-[#6D4DE8]">RELATION SLOT</p>
+            <p className="text-[11px] font-extrabold text-[#6D4DE8]">FRICTION PRESET</p>
             <h2 className="mt-1 truncate text-[26px] font-extrabold leading-tight text-[#17131f]">
-              {person.name}
+              {person.preset.frictionName}
             </h2>
             <p className="mt-2 text-[13px] font-bold leading-relaxed text-[#746B82]">
               {person.preset.description}
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-[#F1EDFF] px-3 py-1.5 text-[12px] font-extrabold text-[#6D4DE8]">
-            {person.relationLabel}
+            {person.preset.categoryLabel}
           </span>
         </div>
 
         <label className="block">
-          <span className="mb-2 block text-[12px] font-extrabold text-[#5B536C]">人物プリセット</span>
+          <span className="mb-2 block text-[12px] font-extrabold text-[#5B536C]">摩擦プリセット</span>
           <select
             value={person.presetId}
             onChange={(event) => onPresetChange(event.target.value)}
             className="w-full rounded-[14px] border border-[#E8DED3] bg-white px-4 py-3 text-[14px] font-bold text-[#221B31] outline-none focus:border-[#A77CFF] focus:ring-4 focus:ring-[#EEE8FF]"
           >
-            {workplacePresets.map(preset => (
-              <option key={preset.id} value={preset.id}>
-                {preset.roleLabel} - {preset.displayName}
-              </option>
+            {presetGroups.map(group => (
+              <optgroup key={group.label} label={group.label}>
+                {group.presets.map(preset => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.frictionName}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -146,7 +164,7 @@ function PanelContent({
             </p>
           </div>
           <div className="rounded-[14px] bg-[#F7F4EF] p-3">
-            <p className="text-[10px] font-extrabold text-[#8D839A]">確信度</p>
+            <p className="text-[10px] font-extrabold text-[#8D839A]">読み方</p>
             <p className="mt-1 text-[14px] font-extrabold text-[#221B31]">
               {confidenceLabels[person.preset.confidence]} / 仮説
             </p>
@@ -159,8 +177,8 @@ function PanelContent({
           <section className="rounded-[18px] border border-[#EEE7DE] bg-white/86 p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-[15px] font-extrabold text-[#221B31]">関係メモ</h3>
-                <p className="mt-1 text-[12px] font-bold text-[#746B82]">あとから実在の相手に合わせて調整できます。</p>
+                <h3 className="text-[15px] font-extrabold text-[#221B31]">保存メモ</h3>
+                <p className="mt-1 text-[12px] font-bold text-[#746B82]">気になる相手だけ、自分用に距離感を調整できます。</p>
               </div>
               <span className="rounded-full bg-[#F1EDFF] px-3 py-1 text-[11px] font-extrabold text-[#6D4DE8]">
                 自分: {selfMbti}
@@ -204,6 +222,15 @@ function PanelContent({
             </div>
           </section>
 
+          <section className="rounded-[18px] border border-[#EEE7DE] bg-white/86 p-4">
+            <p className="text-[12px] font-extrabold text-[#6D4DE8]">隠れた欲求</p>
+            <p className="mt-2 text-[13px] font-bold leading-relaxed text-[#332B45]">
+              {person.preset.hiddenNeed}
+            </p>
+          </section>
+
+          <SectionList title="起きやすい摩擦" items={person.preset.frictionPoints} />
+
           <div className="grid gap-3 sm:grid-cols-2">
             <SectionList title="信頼の作り方" items={person.preset.trustSignals} />
             <SectionList title="地雷になりやすいこと" items={person.preset.riskTriggers} />
@@ -243,7 +270,7 @@ function PanelContent({
               value={concern}
               onChange={(event) => onConcernChange(event.target.value)}
               rows={4}
-              placeholder="例: 来週の締切に間に合わなそうです。上司に早めに相談したいが、詰められそうで怖いです。"
+              placeholder="例: 距離を置きたいけれど、冷たくなったと思われるのが怖いです。"
               className="mt-3 w-full resize-none rounded-[14px] border border-[#E8DED3] bg-[#FFFDFC] px-4 py-3 text-[13px] font-bold leading-relaxed text-[#332B45] outline-none placeholder:text-[#A49AAE] focus:border-[#A77CFF] focus:ring-4 focus:ring-[#EEE8FF]"
             />
             {error && (

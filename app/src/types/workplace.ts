@@ -1,5 +1,13 @@
 export type ConfidenceLevel = 'low' | 'medium' | 'high';
 
+export type RelationshipCategory =
+  | 'work'
+  | 'friend'
+  | 'love'
+  | 'family'
+  | 'boundary'
+  | 'community';
+
 export type WorkplaceNodeTone =
   | 'driver'
   | 'supporter'
@@ -10,14 +18,18 @@ export type WorkplaceNodeTone =
 
 export interface WorkplacePersonPreset {
   id: string;
+  category: RelationshipCategory;
+  categoryLabel: string;
   roleLabel: string;
   displayName: string;
   shortLabel: string;
+  frictionName: string;
   archetype: string;
   tone: WorkplaceNodeTone;
   estimatedMbti: string[];
   confidence: ConfidenceLevel;
   description: string;
+  hiddenNeed: string;
   traits: string[];
   workValues: string[];
   frictionPoints: string[];

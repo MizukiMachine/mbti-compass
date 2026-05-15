@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const person = createWorkplacePerson({
       id: toStringValue(rawPerson.id, 'slot-person'),
       presetId: toStringValue(rawPerson.presetId),
-      relationLabel: toStringValue(rawPerson.relationLabel, '職場の相手'),
+      relationLabel: toStringValue(rawPerson.relationLabel, '関係の相手'),
       name: toStringValue(rawPerson.name),
       closeness: toNumberValue(rawPerson.closeness, 50),
       stress: toNumberValue(rawPerson.stress, 50),

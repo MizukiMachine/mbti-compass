@@ -14,9 +14,9 @@ import {
   WorkplacePerson,
 } from '../../src/types/workplace';
 
-const RESULT_STORAGE_KEY = 'office-compass-self-result';
-const LEGACY_RESULT_STORAGE_KEY = 'mbti-shadow-friend-result';
-const MAP_STORAGE_PREFIX = 'workplace-relationship-map-v1';
+const RESULT_STORAGE_KEY = 'shadow-friend-self-result';
+const LEGACY_RESULT_STORAGE_KEYS = ['office-compass-self-result', 'mbti-shadow-friend-result'];
+const MAP_STORAGE_PREFIX = 'relationship-friction-map-v2';
 
 type SavedPerson = Omit<WorkplacePerson, 'preset'>;
 
@@ -89,7 +89,7 @@ function ExploreContent() {
   const mbtiType = searchParams.get('mbti') || '';
   const selfName = searchParams.get('name') || '';
   const [people, setPeople] = useState<WorkplacePerson[]>(() => createDefaultWorkplacePeople());
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>('slot-manager');
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>('preset-outcome_manager');
   const [selectedActionId, setSelectedActionId] = useState<AdviceActionId>('build_trust');
   const [concern, setConcern] = useState('');
   const [advice, setAdvice] = useState<WorkplaceAdviceResponse | null>(null);
@@ -99,7 +99,9 @@ function ExploreContent() {
 
   useEffect(() => {
     if (!mbtiType) {
-      const stored = localStorage.getItem(RESULT_STORAGE_KEY) ?? localStorage.getItem(LEGACY_RESULT_STORAGE_KEY);
+      const stored = [RESULT_STORAGE_KEY, ...LEGACY_RESULT_STORAGE_KEYS]
+        .map(key => localStorage.getItem(key))
+        .find(Boolean);
       if (stored) {
         try {
           const { type, name } = JSON.parse(stored);
@@ -218,8 +220,8 @@ function ExploreContent() {
         <div className="mb-8 flex items-center gap-3">
           <LogoMark />
           <div>
-            <p className="text-[11px] font-extrabold text-[#7A62E8]">OFFICE COMPASS</p>
-            <p className="text-[22px] font-extrabold leading-tight text-[#17131f]">職場関係マップ</p>
+            <p className="text-[11px] font-extrabold text-[#7A62E8]">SHADOW FRIEND</p>
+            <p className="text-[22px] font-extrabold leading-tight text-[#17131f]">関係摩擦マップ</p>
           </div>
         </div>
 
@@ -228,15 +230,15 @@ function ExploreContent() {
           <h1 className="mt-2 text-[56px] font-extrabold leading-none text-[#5B42D2]">{mbtiType}</h1>
           <p className="mt-3 truncate text-[15px] font-extrabold text-[#2A2338]">{selfName || 'あなた'}</p>
           <p className="mt-4 text-[13px] font-bold leading-relaxed text-[#746B82]">
-            MBTIは断定ではなく、職場コミュニケーションの仮説を組み立てる補助情報として使います。
+            MBTIは断定ではなく、自分と相手の摩擦パターンを眺める補助情報として使います。
           </p>
         </section>
 
         <section className="mt-4 rounded-[20px] bg-white p-5 shadow-[0_14px_36px_rgba(45,33,68,0.06)]">
           <p className="text-[12px] font-extrabold text-[#5B536C]">使い方</p>
           <ol className="mt-4 space-y-3 text-[13px] font-bold leading-relaxed text-[#3D354B]">
-            <li>1. 周囲の人物スロットを選ぶ</li>
-            <li>2. プリセットやメモを調整する</li>
+            <li>1. 気になる人物プリセットを選ぶ</li>
+            <li>2. 摩擦の起き方と隠れた欲求を見る</li>
             <li>3. 相談アクションを選ぶ</li>
             <li>4. 方針、文面、次の一手を生成する</li>
           </ol>
@@ -247,7 +249,7 @@ function ExploreContent() {
           onClick={() => router.push('/')}
           className="mt-auto rounded-[16px] border border-[#E8DED3] bg-white px-4 py-3 text-[13px] font-extrabold text-[#5B536C] transition-colors hover:text-[#6D4DE8]"
         >
-          自分診断をやり直す
+          自分タイプを選び直す
         </button>
       </aside>
 

@@ -11,8 +11,8 @@ import {
 } from '../src/data/mbti-questions';
 
 const easeOut = [0.16, 1, 0.3, 1];
-const STORAGE_KEY = 'office-compass-self-result';
-const LEGACY_STORAGE_KEY = 'mbti-shadow-friend-result';
+const STORAGE_KEY = 'shadow-friend-self-result';
+const LEGACY_STORAGE_KEYS = ['office-compass-self-result', 'mbti-shadow-friend-result'];
 
 const axisMeta: Record<MbtiAxis, { label: string; title: string; color: string; soft: string; border: string }> = {
   EI: { label: 'ENERGY', title: '外向 / 内向', color: '#6D4DE8', soft: '#F1EDFF', border: '#B99BFF' },
@@ -112,7 +112,6 @@ function TextInput({
   return (
     <input
       type="text"
-      required
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
@@ -133,7 +132,9 @@ export default function Home() {
   const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const saved = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS]
+      .map(key => localStorage.getItem(key))
+      .find(Boolean);
     if (!saved) return;
     try {
       const parsed = JSON.parse(saved) as SavedResult;
@@ -209,11 +210,11 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <LogoMark />
                 <div>
-                  <p className="text-[11px] font-extrabold text-[#7A62E8]">OFFICE COMPASS</p>
+                  <p className="text-[11px] font-extrabold text-[#7A62E8]">SHADOW FRIEND</p>
                   <div className="text-[22px] font-extrabold leading-[1.02] text-[#17131f]">
-                    職場関係
+                    関係摩擦
                     <br />
-                    シミュレーター
+                    マップ
                   </div>
                 </div>
               </div>
@@ -230,15 +231,15 @@ export default function Home() {
                   transition={{ delay: 0.1, duration: 0.45, ease: easeOut }}
                 >
                   <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#E8DED3] bg-white/78 px-4 py-2 text-[12px] font-extrabold text-[#6D4DE8] soft-card">
-                    WORKPLACE RELATIONSHIP MAP
+                    SHADOW FRIEND PRESETS
                   </div>
                   <h1 className="text-[46px] font-extrabold leading-[0.98] text-[#17131f] sm:text-[62px] lg:text-[76px]">
-                    職場の人間関係を
+                    人間関係の摩擦を
                     <br />
-                    相談できる地図に
+                    読める地図に
                   </h1>
                   <p className="mt-5 max-w-xl text-[16px] font-bold leading-relaxed text-[#5B536C] sm:text-[17px]">
-                    まず自分のMBTI傾向を診断し、中心に自分、周囲に上司・同僚・後輩などの人物スロットを配置します。相手ごとに、頼み方、断り方、1on1、関係修復の方針をシミュレーションできます。
+                    まず自分のMBTI傾向を診断し、周囲にいそうな人物プリセットを眺めます。「正論で詰めてくる先輩」「距離感が近すぎる友人」など、関係で起きる摩擦から接し方をシミュレーションできます。
                   </p>
                 </motion.div>
 
@@ -249,8 +250,8 @@ export default function Home() {
                   className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
                 >
                   {[
-                    ['人物スロット', '上司・同僚・後輩をプリセットで配置'],
-                    ['相談パネル', '頼む・断る・謝る・雑談を選択'],
+                    ['摩擦プリセット', '職場・友人・恋愛・家族から選んで読む'],
+                    ['関係メモ', '信頼度と心理的負荷だけ軽く調整'],
                     ['実用アウトプット', '方針、NG表現、文面、次の一手'],
                   ].map(([title, body]) => (
                     <div key={title} className="rounded-[18px] border border-[#E8DED3] bg-white/86 p-4 soft-card">
@@ -271,24 +272,24 @@ export default function Home() {
                   <div>
                     <p className="text-[12px] font-extrabold text-[#6D4DE8]">START</p>
                     <h2 className="mt-2 text-[27px] font-extrabold leading-tight text-[#17131f]">
-                      自分の診断から始める
+                      自分タイプから始める
                     </h2>
                     <p className="mt-2 text-[14px] font-bold leading-relaxed text-[#746B82]">
-                      名前は職場マップの中心表示と保存データにだけ使います。
+                      名前はマップの中心表示と保存データにだけ使います。空欄でも始められます。
                     </p>
                   </div>
 
                   <TextInput
                     value={name}
                     onChange={setName}
-                    placeholder="お名前"
+                    placeholder="ニックネーム（任意）"
                     onEnter={() => {
-                      if (name.trim()) startDiagnosis();
+                      startDiagnosis();
                     }}
                   />
 
-                  <PrimaryButton onClick={startDiagnosis} disabled={!name.trim()}>
-                    自分診断を始める
+                  <PrimaryButton onClick={startDiagnosis}>
+                    診断してマップを見る
                     <ArrowRightIcon />
                   </PrimaryButton>
 
@@ -298,7 +299,7 @@ export default function Home() {
                       onClick={() => openMap(savedResult)}
                       className="flex w-full items-center justify-between gap-4 rounded-[16px] border border-[#B99BFF] bg-[#F1EDFF] px-5 py-4 text-left text-[#5B42D2] transition-all hover:border-[#7A62E8]"
                     >
-                      <span className="font-extrabold">前回の職場マップを開く</span>
+                      <span className="font-extrabold">前回の関係マップを開く</span>
                       <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold">{savedResult.type}</span>
                     </button>
                   )}
@@ -317,7 +318,7 @@ export default function Home() {
                 <LogoMark className="h-10 w-10" />
                 <div>
                   <p className="text-[11px] font-extrabold text-[#9B91A8]">SELF DIAGNOSIS</p>
-                  <p className="text-[15px] font-extrabold text-[#2A2338]">職場関係シミュレーター</p>
+                  <p className="text-[15px] font-extrabold text-[#2A2338]">関係摩擦マップ</p>
                 </div>
               </div>
               <div className="rounded-full border border-[#E8DED3] bg-white/86 px-4 py-2 text-[12px] font-extrabold text-[#5B536C] soft-card">
