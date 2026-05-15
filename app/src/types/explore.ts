@@ -1,32 +1,25 @@
-export type CardCategory = 'strength' | 'tendency' | 'shadow' | 'growth' | 'insight' | 'trend';
+export type NodeType = 'related' | 'contrast' | 'deep' | 'growth' | 'shadow';
 
-export interface DynamicCard {
+export interface ExploreNode {
   id: string;
-  label: string;
-  emoji: string;
-  color: string;
-  category: CardCategory;
-  shortDescription: string;
-  longDescription: string;
-  relatedFunctions: string[];
-  sourceType: 'static' | 'llm';
-  trendReference?: { articleTitle: string; source: string };
+  text: string;
+  description: string;
+  nodeType: NodeType;
+  parentId: string | null;
+  features: string[];
+  strengths: string[];
+  cautions: string[];
+  relatedThemes: string[];
+  opposingThemes: string[];
 }
 
-export interface SelectionEntry {
-  cardId: string;
-  label: string;
-  category: CardCategory;
-  shortDescription: string;
-  phase: number;
-}
-
-export interface GenerateRequest {
+export interface TreeGenerateRequest {
   mbtiType: string;
-  phase: number;
-  selectionHistory: SelectionEntry[];
+  depth: number;
+  parentNode?: ExploreNode;
+  pathHistory?: string[];
 }
 
-export interface GenerateResponse {
-  cards: DynamicCard[];
+export interface TreeGenerateResponse {
+  nodes: ExploreNode[];
 }

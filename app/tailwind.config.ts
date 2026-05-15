@@ -9,18 +9,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // IVE-inspired elegant palette
-        background: '#0A0A0F',        // Deep midnight blue-black
-        surface: '#1A1A28',           // Soft purple-tinted dark
-        'surface-elevated': '#252535', // Elevated purple-gray
-        accent: '#C084FC',            // Soft purple (IVE signature)
-        'accent-secondary': '#A78BFA', // Lighter purple
-        'accent-glow': '#DDD6FE',     // Pale lavender glow
-        border: 'rgba(192, 132, 252, 0.15)', // Purple-tinted border
+        background: '#FBFAF7',        // Warm canvas
+        surface: '#FFFFFF',           // White
+        'surface-elevated': '#FFFFFF', // White
+        accent: '#533DC2',            // Deep purple
+        'accent-secondary': '#8A7CE5', // Lighter purple
+        'accent-glow': '#ECEBFE',     // Pale lavender glow
+        border: 'rgba(0, 0, 0, 0.08)', // Light border
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'sans-serif'],
-        display: ['Playfair Display', 'serif'],
+        sans: ['Avenir Next', 'Helvetica Neue', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'sans-serif'],
+        display: ['Georgia', 'Times New Roman', 'Yu Mincho', 'Hiragino Mincho ProN', 'serif'],
       },
       fontSize: {
         'display': ['48px', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '600' }],

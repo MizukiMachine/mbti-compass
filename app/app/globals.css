@@ -2,17 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&display=swap');
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-body {
-  color: white;
-  background: #000000;
-  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+  html {
+    background: #fbfaf7;
+  }
+
+  body {
+    color: #17131f;
+    background:
+      radial-gradient(circle at 38% 30%, rgba(124, 92, 232, 0.08), transparent 32rem),
+      radial-gradient(circle at 72% 78%, rgba(255, 126, 83, 0.08), transparent 28rem),
+      #fbfaf7;
+    font-family: 'Avenir Next', 'Helvetica Neue', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-/* Custom scrollbar - Apple style */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -20,10 +35,32 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  background: rgba(92, 75, 139, 0.18);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(92, 75, 139, 0.28);
+}
+
+@layer utilities {
+  .explore-canvas-texture {
+    background:
+      linear-gradient(rgba(102, 82, 160, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(102, 82, 160, 0.035) 1px, transparent 1px),
+      radial-gradient(circle at 52% 48%, rgba(125, 91, 232, 0.08), transparent 24rem),
+      radial-gradient(circle at 64% 60%, rgba(255, 126, 83, 0.07), transparent 26rem),
+      #fffdfa;
+    background-size: 48px 48px, 48px 48px, auto, auto, auto;
+  }
+
+  .soft-card {
+    border: 1px solid rgba(75, 55, 112, 0.09);
+    box-shadow: 0 14px 40px rgba(45, 33, 68, 0.08);
+  }
+
+  .glass-surface {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px);
+  }
 }

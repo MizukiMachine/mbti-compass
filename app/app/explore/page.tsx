@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { DynamicCard } from '../../src/types/explore';
-import { useExploreState } from '../../src/lib/use-explore-state';
-import TraitScatterView from './TraitScatterView';
-import DrillDownView from './DrillDownView';
+import { useTreeExploreState } from '../../src/lib/use-explore-state';
+import LeftSidebar from './LeftSidebar';
+import GraphCanvas from './GraphCanvas';
+import DescriptionPanel from './DescriptionPanel';
 
 export default function ExplorePage() {
   return (
@@ -14,8 +13,8 @@ export default function ExplorePage() {
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-white/40 text-sm">Loading...</p>
+            <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+            <p className="text-gray-400 font-bold text-sm tracking-wide">Loading...</p>
           </div>
         </div>
       }
@@ -29,25 +28,15 @@ function ExploreContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const mbtiType = searchParams.get('mbti') || '';
-  const userName = searchParams.get('name') || '';
-  const [selectedTrait, setSelectedTrait] = useState<DynamicCard | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
 
   const {
-    phase, selectionHistory, isLoadingNext, error,
-    cards, selectCard, fetchNextPhase,
-  } = useExploreState(mbtiType);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+    nodeTree, currentIds, selectedNodeId, breadcrumbTexts, path,
+    isLoading, error, currentParentId, fetchRootNodes, selectNode, expandNode, goBack,
+  } = useTreeExploreState(mbtiType);
 
   useEffect(() => {
     if (!mbtiType) {
-      const stored = localStorage.getItem('mbti-result');
+      const stored = localStorage.getItem('mbti-shadow-friend-result');
       if (stored) {
         try {
           const { type, name } = JSON.parse(stored);
@@ -56,7 +45,7 @@ function ExploreContent() {
           if (name) params.set('name', name);
           router.replace(`/explore?${params.toString()}`);
           return;
-        } catch {}
+        } catch { }
       }
       router.replace('/');
     }
@@ -65,58 +54,60 @@ function ExploreContent() {
   if (!mbtiType) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const handleSelect = (card: DynamicCard) => {
-    selectCard(card);
-    setSelectedTrait(card);
-  };
+  const selectedNode = selectedNodeId ? nodeTree[selectedNodeId] ?? null : null;
+  const currentParentNode = currentParentId ? nodeTree[currentParentId] ?? null : null;
+  const currentNodes = currentIds.map(id => nodeTree[id]).filter(Boolean);
+  const currentDepth = currentParentId ? path.length + 1 : 0;
 
   return (
-    <AnimatePresence mode="wait">
-      {!selectedTrait ? (
-        <motion.div
-          key="scatter"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <TraitScatterView
-            mbtiType={mbtiType}
-            userName={userName}
-            cards={cards}
-            onSelect={handleSelect}
-            isMobile={isMobile}
-            phase={phase}
-            isLoadingNext={isLoadingNext}
-            onExploreDeeper={fetchNextPhase}
-            selectionCount={selectionHistory.length}
-            error={error}
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="drilldown"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          <DrillDownView
-            card={selectedTrait}
-            mbtiType={mbtiType}
-            userName={userName}
-            onBack={() => setSelectedTrait(null)}
-            phase={phase}
-            onNextExploration={fetchNextPhase}
-            isLoadingNext={isLoadingNext}
-          />
-        </motion.div>
+    <div className="h-dvh w-screen bg-background flex overflow-hidden font-sans text-[#17131f]">
+
+      {/* 1. Left Sidebar */}
+      <LeftSidebar
+        mbtiType={mbtiType}
+        depth={currentDepth}
+        breadcrumbTexts={breadcrumbTexts}
+        onBack={goBack}
+        canGoBack={currentParentId !== null}
+      />
+
+      {/* 2. Graph Canvas (Center) */}
+      <GraphCanvas
+        nodes={currentNodes}
+        parentNode={currentParentNode}
+        selectedNodeId={selectedNodeId}
+        onSelectNode={selectNode}
+        isLoading={isLoading}
+        mbtiType={mbtiType}
+      />
+
+      {/* 3. Description Panel (Right Sidebar) */}
+      <DescriptionPanel
+        node={selectedNode}
+        breadcrumbTexts={breadcrumbTexts}
+        onBack={goBack}
+        canGoBack={currentParentId !== null}
+        onDigDeeper={() => {
+          if (selectedNode) expandNode(selectedNode.id);
+        }}
+        isLoadingChildren={isLoading}
+      />
+
+      {/* Error Overlay */}
+      {error && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg font-bold flex items-center gap-3">
+          <span>⚠️ {error}</span>
+          <button onClick={fetchRootNodes} className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm transition-colors">
+            リトライ
+          </button>
+        </div>
       )}
-    </AnimatePresence>
+
+    </div>
   );
 }

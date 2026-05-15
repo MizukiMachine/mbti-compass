@@ -209,7 +209,7 @@ export default function Home() {
   const progress = questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#10131A]">
       {/* Landing */}
       {step === 'landing' && (
         <motion.div
