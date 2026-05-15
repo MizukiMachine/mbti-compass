@@ -1,107 +1,83 @@
-# MBTI Shadow Friend（もう一人の自分）
+# Office Compass（職場の人間関係シミュレーター）
 
-MBTI性格診断で見つける、あなたの分身AI。20の質問に答えると、あなたと同じMBTIタイプのキャラクターが「影の機能（シャドウ）」の視点から新しい気づきを与えてくれます。
+自分のMBTI傾向を診断し、職場の人物スロットを埋めながら、相手ごとの頼み方・断り方・1on1・関係修復をシミュレーションするアプリです。
+
+MBTIは相手を断定するためではなく、職場コミュニケーションの仮説を作る補助情報として扱います。
 
 ## 機能
 
-- **MBTI診断** — 20問（4軸×5問）でMBTIタイプを判定
-- **16キャラクター** — 各タイプにユニークな名前・会話スタイル・シャドウ機能を定義
-- **AIチャット** — GLM-5-turboによるキャラクター寄りの自然な対話
-- **音声入力** — Web Speech APIでマイクから入力可能
-- **ユーザー認証** — Supabase Auth（メール+パスワード）
-- **データ永続化** — 診断結果・チャット履歴をSupabaseに保存（直近50件）
-- **結果シェア** — Web Share API / Twitterで診断結果を共有
+- **自分診断** — 20問（4軸×5問）で自分のMBTI傾向を判定
+- **職場関係マップ** — 中心に自分、周囲に上司・同僚・後輩・他部署などの人物スロットを配置
+- **人物プリセット** — 成果重視の上司、空気を読む同僚、慎重な先輩、圧が強い他部署などを初期配置
+- **関係メモ** — 相手ごとに信頼度、心理的負荷、メモを調整
+- **相談アクション** — 信頼構築、頼みごと、断り方、フィードバック、関係修復、距離の取り方、雑談、1on1
+- **実用アウトプット** — 方針、避けたい言い方、文面ドラフト、会話の切り出し、次の一手を生成
+- **ローカル保存** — 診断結果と職場マップをブラウザに保存
 
 ## アーキテクチャ
 
-```
+```text
 mbti-shadow-friend/
-├── app/                          # Next.js 14 アプリケーション
+├── app/
 │   ├── app/
-│   │   ├── page.tsx              # ランディング + 診断 + 結果表示
-│   │   ├── chat/page.tsx         # AIチャット画面
-│   │   ├── api/chat/route.ts     # LLM API（GLM-5-turbo）
-│   │   └── auth/                 # 認証ページ
-│   │       ├── login/page.tsx
-│   │       ├── signup/page.tsx
-│   │       └── callback/route.ts
-│   ├── middleware.ts             # セッション管理 + /chat保護
+│   │   ├── page.tsx                         # 自分診断の入口
+│   │   ├── explore/
+│   │   │   ├── page.tsx                     # 職場関係マップ画面
+│   │   │   ├── WorkplaceMapCanvas.tsx       # 中心に自分、周囲に人物スロット
+│   │   │   └── RelationshipPanel.tsx        # 人物詳細、相談アクション、回答表示
+│   │   └── api/workplace/advice/route.ts    # 相談アドバイス生成API
 │   ├── src/
-│   │   ├── lib/supabase/        # Supabaseクライアント
-│   │   ├── data/                 # MBTIキャラクター・診断データ
-│   │   ├── services/             # 会話エンジン
-│   │   ├── components/           # UIコンポーネント
-│   │   └── types/                # 型定義
-│   └── tailwind.config.ts        # Tailwind設定
-├── supabase/
-│   └── migrations/001_initial.sql # DDL + RLSポリシー
-├── src/                          # Rust CLI（旧実装、現在未使用）
-└── docs/                         # 設計ドキュメント
+│   │   ├── data/
+│   │   │   ├── mbti-questions.ts            # 自分診断の質問
+│   │   │   └── workplace-presets.ts         # 職場人物プリセットと相談アクション
+│   │   ├── lib/
+│   │   │   └── workplace-advice.ts          # LLMプロンプトとフォールバック回答
+│   │   └── types/
+│   │       └── workplace.ts                 # 職場マップ関連の型
+│   └── tailwind.config.ts
+└── docs/
 ```
+
+## 体験フロー
+
+1. 名前を入力して自分診断を始める
+2. 診断結果を中心にした職場関係マップへ移動
+3. 上司、同僚、後輩、他部署などの人物スロットを選ぶ
+4. プリセットや関係メモを実際の相手に合わせて調整
+5. 「頼みごとをする」「断る」「1on1に備える」などの相談アクションを選ぶ
+6. AIが方針、NG表現、文面ドラフト、次の一手を返す
 
 ## 技術スタック
 
 | レイヤー | 技術 |
-|----------|------|
+|---|---|
 | フロントエンド | Next.js 14, React 18, Tailwind CSS, Framer Motion |
 | LLM | GLM-5-turbo（Z.ai / Anthropic互換API） |
-| 認証・DB | Supabase（Auth, PostgreSQL, RLS） |
-| 音声入力 | Web Speech API（ブラウザネイティブ） |
-
-## データモデル
-
-```sql
-profiles          -- auth.usersと1:1（display_name）
-diagnosis_results -- ユーザーの診断履歴（mbti_type + CHECK制約）
-conversations     -- ユーザー×キャラクターの会話セッション
-messages          -- 直近50件を保存、古いものは自動削除
-```
-
-全テーブルRLS有効。ユーザーは自分のデータのみアクセス可能。
-
-## 認証フロー
-
-- **未ログイン**: 診断・チャット可能（localStorageのみ、リロードでチャット履歴消失）
-- **ログイン済み**: 診断結果・チャット履歴がSupabaseに永続化
-- `/chat` はログイン必須（ミドルウェアで保護）
-- サインアップ時に `auth.users` → `profiles` 自動作成（トリガー）
-
-## セットアップ
-
-```bash
-cd app
-npm install
-
-# .envに以下を設定
-cp .env.example .env
-# ANTHROPIC_API_KEY       — Z.ai APIキー
-# NEXT_PUBLIC_SUPABASE_URL — Supabase Project URL
-# NEXT_PUBLIC_SUPABASE_ANON_KEY — Supabase Anon Key
-
-# SupabaseのSQL Editorで supabase/migrations/001_initial.sql を実行
-
-npm run dev
-```
+| 永続化 | localStorage（診断結果・職場マップ） |
+| テスト | Jest |
 
 ## 環境変数
 
 | 変数名 | 必須 | 説明 |
-|--------|------|------|
-| `ANTHROPIC_API_KEY` | Yes | Z.ai APIキー |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Anon Key |
+|---|---:|---|
+| `ANTHROPIC_API_KEY` | No | 設定すると相談回答にLLMを使用。未設定時はフォールバック回答 |
 | `LLM_MODEL` | No | デフォルト: `glm-5-turbo` |
 | `LLM_BASE_URL` | No | デフォルト: `https://api.z.ai/api/anthropic` |
+| `LLM_TIMEOUT_MS` | No | デフォルト: `10000` |
+
+Supabase関連の認証ファイルは旧実装の名残として残っていますが、現在のMVPでは診断結果と職場マップはlocalStorageに保存します。
 
 ## 開発コマンド
 
 ```bash
-npm run dev     # 開発サーバー起動
-npm run build   # プロダクションビルド
-npm run lint    # ESLint
-npm run test    # Jest
+cd app
+npm install
+npm run dev
+npm run lint
+npm run test
+npm run build
 ```
 
-## ライセンス
+## 注意
 
-Apache-2.0
+相手のMBTI候補は観察情報からの仮説です。実在の人物を断定・分類する目的ではなく、職場での伝え方や合意形成を考えるための補助として使います。
