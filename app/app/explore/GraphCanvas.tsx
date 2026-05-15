@@ -9,6 +9,7 @@ interface GraphCanvasProps {
   parentNode: ExploreNode | null;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  onRetry: () => void;
   isLoading: boolean;
   mbtiType: string;
 }
@@ -216,6 +217,7 @@ export default function GraphCanvas({
   parentNode,
   selectedNodeId,
   onSelectNode,
+  onRetry,
   isLoading,
   mbtiType,
 }: GraphCanvasProps) {
@@ -432,9 +434,19 @@ export default function GraphCanvas({
 
       {!isLoading && nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-          <div className="bg-white px-8 py-6 rounded-[24px] soft-card text-center">
+          <div className="bg-white px-8 py-6 rounded-[24px] soft-card text-center pointer-events-auto">
             <p className="font-bold text-[#17131f] mb-1">表示できるノードがありません</p>
-            <p className="text-sm text-[#746B82]">左上のリトライから再生成してください。</p>
+            <p className="text-sm text-[#746B82] mb-5">通信状況を確認して、もう一度生成してください。</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mx-auto flex items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-[#7A62E8] to-[#5430D1] px-5 py-3 text-sm font-extrabold text-white shadow-[0_14px_28px_rgba(86,48,209,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(86,48,209,0.28)]"
+            >
+              再生成
+              <svg fill="none" viewBox="0 0 24 24" strokeWidth={2.3} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 21.7 13.7 16.6l-2.5 2.2.6-9.4 5.2 7.9-3.3-.7M7.5 18.5A8.3 8.3 0 1 1 20.3 10.5" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

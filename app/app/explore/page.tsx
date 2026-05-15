@@ -82,6 +82,7 @@ function ExploreContent() {
         parentNode={currentParentNode}
         selectedNodeId={selectedNodeId}
         onSelectNode={selectNode}
+        onRetry={fetchRootNodes}
         isLoading={isLoading}
         mbtiType={mbtiType}
       />
